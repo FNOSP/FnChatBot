@@ -1,0 +1,14 @@
+/.trae/skills/dev-browser/node_modules/
+/.trae/skills/dev-browser/tmp/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.vite
