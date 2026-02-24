@@ -19,13 +19,12 @@ import {
   Space,
   Switch,
   Modal,
-  Checkbox,
-  CheckboxGroup,
   Toast,
   Spin,
   Tag,
   Empty
 } from '@kousum/semi-ui-vue'
+import type { ColumnProps } from '@kousum/semi-ui-vue/dist/table/interface'
 import {
   IconPlus,
   IconDelete,
@@ -78,7 +77,6 @@ const providers = ref<Provider[]>([])
 const modelListVisible = ref(false)
 const modelListLoading = ref(false)
 const availableModels = ref<{ id: string; name: string; owned_by?: string }[]>([])
-const selectedModels = ref<string[]>([])
 
 const buildDefaultProviders = (): Provider[] => {
   return predefinedProviders.map(predefined => ({
@@ -115,7 +113,31 @@ const selectedProvider = computed(() => {
   return providers.value.find(p => p.provider_id === selectedProviderId.value)
 })
 
-const columns = computed(() => [
+const localModelMap = computed(() => {
+  const map = new Map<string, Model>()
+  const models = selectedProvider.value?.models || []
+  for (const model of models) {
+    if (model.model_id) {
+      map.set(model.model_id, model)
+    }
+  }
+  return map
+})
+
+const sortProvidersByName = (list: Provider[]) => {
+  return [...list].sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }))
+}
+
+const getDefaultProviderId = (list: Provider[]) => {
+  const enabledProviders = list.filter(p => p.enabled)
+  if (enabledProviders.length > 0) {
+    return sortProvidersByName(enabledProviders)[0].provider_id
+  }
+  const sortedAll = sortProvidersByName(list)
+  return sortedAll[0]?.provider_id || null
+}
+
+const columns = computed((): ColumnProps<Model>[] => [
   { title: t('settings.displayName'), key: 'name', dataIndex: 'name' },
   { title: t('settings.modelId'), key: 'model_id', dataIndex: 'model_id' },
   { title: t('common.actions'), key: 'actions', width: 120, align: 'right' }
@@ -154,9 +176,12 @@ const fetchProviders = async () => {
     const mergedList = [...mergedProviders, ...customProviders]
     providers.value = mergedList.length > 0 ? mergedList : buildDefaultProviders()
     
-    if (providers.value.length > 0 && !selectedProviderId.value) {
-      const firstEnabled = providers.value.find(p => p.enabled)
-      selectedProviderId.value = firstEnabled?.provider_id || providers.value[0].provider_id
+    if (providers.value.length > 0) {
+      const fallbackId = getDefaultProviderId(providers.value)
+      const hasSelected = selectedProviderId.value && providers.value.some(p => p.provider_id === selectedProviderId.value)
+      if (!hasSelected && fallbackId) {
+        selectedProviderId.value = fallbackId
+      }
     }
   } catch (e) {
     console.error('Failed to fetch providers', e)
@@ -240,7 +265,6 @@ const fetchRemoteModels = async () => {
       api_key: p.api_key
     })
     availableModels.value = res.data.models || []
-    selectedModels.value = []
     
     if (availableModels.value.length > 0) {
       modelListVisible.value = true
@@ -255,34 +279,47 @@ const fetchRemoteModels = async () => {
   }
 }
 
-const selectAllModels = () => {
-  selectedModels.value = availableModels.value.map(m => m.id)
+const isModelAdded = (modelId: string) => {
+  return localModelMap.value.has(modelId)
 }
 
-const deselectAllModels = () => {
-  selectedModels.value = []
-}
-
-const addSelectedModels = async () => {
+const addRemoteModel = async (model: { id: string; name: string; owned_by?: string }) => {
   if (!selectedProvider.value || !selectedProvider.value.id) return
-  
+  if (isModelAdded(model.id)) return
+
   saving.value = true
   try {
-    for (const modelId of selectedModels.value) {
-      const modelInfo = availableModels.value.find(m => m.id === modelId)
-      await axios.post(`${API_BASE}/providers/${selectedProvider.value.id}/models`, {
-        model_id: modelId,
-        name: modelInfo?.name || modelId,
-        owned_by: modelInfo?.owned_by || '',
-        enabled: true
-      })
+    const res = await axios.post(`${API_BASE}/providers/${selectedProvider.value.id}/models`, {
+      model_id: model.id,
+      name: model.name || model.id,
+      owned_by: model.owned_by || '',
+      enabled: true
+    })
+    if (!selectedProvider.value.models) {
+      selectedProvider.value.models = []
     }
-    
-    await fetchProviders()
-    modelListVisible.value = false
-    Toast.success(t('settings.modelList.addSuccess', { count: selectedModels.value.length }))
+    selectedProvider.value.models.push(res.data)
+    Toast.success(t('common.success'))
   } catch (e) {
-    console.error('Failed to add models', e)
+    console.error('Failed to add model', e)
+    Toast.error(t('common.error'))
+  } finally {
+    saving.value = false
+  }
+}
+
+const removeRemoteModel = async (modelId: string) => {
+  if (!selectedProvider.value) return
+  const target = localModelMap.value.get(modelId)
+  if (!target?.id) return
+
+  saving.value = true
+  try {
+    await axios.delete(`${API_BASE}/models/${target.id}`)
+    selectedProvider.value.models = selectedProvider.value.models?.filter(m => m.id !== target.id) || []
+    Toast.success(t('common.success'))
+  } catch (e) {
+    console.error('Failed to delete model', e)
     Toast.error(t('common.error'))
   } finally {
     saving.value = false
@@ -394,7 +431,7 @@ watch(selectedProviderId, () => {
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2">
                         <span class="font-medium text-sm truncate">{{ item.name }}</span>
-                        <Tag v-if="item.enabled" color="green" size="small">{{ t('common.enabled') }}</Tag>
+                        <Tag v-if="item.enabled" color="green" size="small">ON</Tag>
                       </div>
                       <TypographyText type="secondary" size="small" class="truncate block">
                         {{ item.models?.length || 0 }} {{ t('settings.models') }}
@@ -575,52 +612,48 @@ watch(selectedProviderId, () => {
         width="600px"
       >
         <div class="space-y-4">
-          <div class="flex gap-2 items-center">
-            <Button size="small" @click="selectAllModels">{{ t('settings.modelList.selectAll') }}</Button>
-            <Button size="small" @click="deselectAllModels">{{ t('settings.modelList.deselectAll') }}</Button>
-            <TypographyText type="secondary" class="ml-auto">
-              {{ t('settings.modelList.selected', { count: selectedModels.length }) }}
-            </TypographyText>
-          </div>
-
           <div v-if="availableModels.length === 0" class="text-center py-8 text-gray-500">
             {{ t('settings.modelList.noModelsFound') }}
           </div>
 
-          <CheckboxGroup
-            v-else
-            v-model="selectedModels"
-            direction="vertical"
-            class="w-full max-h-80 overflow-y-auto"
+          <div
+            v-for="model in availableModels"
+            :key="model.id"
+            class="py-3 border-b last:border-b-0"
+            :class="isDark ? 'border-zinc-700' : 'border-gray-100'"
           >
-            <div
-              v-for="model in availableModels"
-              :key="model.id"
-              class="py-2 border-b last:border-b-0"
-              :class="isDark ? 'border-zinc-700' : 'border-gray-100'"
-            >
-              <Checkbox :value="model.id">
-                <div class="flex flex-col">
-                  <span class="font-medium">{{ model.name || model.id }}</span>
-                  <TypographyText v-if="model.owned_by" type="secondary" size="small">
-                    {{ model.owned_by }}
-                  </TypographyText>
-                </div>
-              </Checkbox>
+            <div class="flex items-center justify-between gap-4">
+              <div class="flex flex-col min-w-0">
+                <span class="font-medium truncate">{{ model.name || model.id }}</span>
+                <TypographyText v-if="model.owned_by" type="secondary" size="small" class="truncate">
+                  {{ model.owned_by }}
+                </TypographyText>
+              </div>
+              <div class="flex items-center gap-2">
+                <Tag v-if="isModelAdded(model.id)" color="green" size="small">ON</Tag>
+                <Button
+                  v-if="isModelAdded(model.id)"
+                  type="danger"
+                  theme="borderless"
+                  :icon="IconDelete"
+                  size="small"
+                  :disabled="saving"
+                  @click="removeRemoteModel(model.id)"
+                />
+                <Button
+                  v-else
+                  theme="borderless"
+                  :icon="IconPlus"
+                  size="small"
+                  :disabled="saving"
+                  @click="addRemoteModel(model)"
+                />
+              </div>
             </div>
-          </CheckboxGroup>
+          </div>
 
           <div class="flex justify-end gap-2 pt-4 border-t" :class="isDark ? 'border-zinc-700' : 'border-gray-200'">
             <Button @click="modelListVisible = false">{{ t('common.cancel') }}</Button>
-            <Button 
-              theme="solid" 
-              type="primary" 
-              :disabled="selectedModels.length === 0"
-              :loading="saving"
-              @click="addSelectedModels"
-            >
-              {{ t('settings.modelList.addSelected') }}
-            </Button>
           </div>
         </div>
       </Modal>

@@ -221,7 +221,7 @@ func handleUserMessage(conn *websocket.Conn, conversationIDStr string, msg WSMes
 
 	// Fetch conversation and model config
 	var conversation models.Conversation
-	if err := db.DB.Preload("Model").First(&conversation, uint(conversationID)).Error; err != nil {
+	if err := db.DB.Preload("Model").Preload("Model.ProviderRef").First(&conversation, uint(conversationID)).Error; err != nil {
 		log.Printf("Conversation not found: %v", err)
 		sendJSON(conn, WSMessage{
 			Type:    TypeMessage,
@@ -284,7 +284,25 @@ func handleUserMessage(conn *websocket.Conn, conversationIDStr string, msg WSMes
 }
 
 func streamChatCompletion(config models.ModelConfig, messages []ChatMessage, conn *websocket.Conn) (string, error) {
-	baseURL := strings.TrimSuffix(config.BaseURL, "/")
+	var provider models.Provider
+	if config.ProviderRef != nil {
+		provider = *config.ProviderRef
+	} else if config.ProviderID != 0 {
+		if err := db.DB.First(&provider, config.ProviderID).Error; err != nil {
+			return "", fmt.Errorf("provider not found: %v", err)
+		}
+	} else {
+		return "", fmt.Errorf("provider not configured for model")
+	}
+
+	if provider.BaseURL == "" {
+		return "", fmt.Errorf("provider base URL is empty")
+	}
+	if provider.APIKey == "" {
+		return "", fmt.Errorf("provider API key is empty")
+	}
+
+	baseURL := strings.TrimSuffix(provider.BaseURL, "/")
 	if !strings.HasSuffix(baseURL, "/v1") {
 		baseURL += "/v1"
 	}
@@ -331,7 +349,7 @@ func streamChatCompletion(config models.ModelConfig, messages []ChatMessage, con
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", config.ApiKey))
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", provider.APIKey))
 
 		resp, err := client.Do(req)
 		if err != nil {

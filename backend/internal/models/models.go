@@ -11,8 +11,8 @@ type ModelConfig struct {
 	ID          uint      `gorm:"primaryKey" json:"id"`
 	Name        string    `gorm:"type:varchar(100);not null" json:"name"`
 	Provider    string    `gorm:"type:varchar(50);not null;index" json:"provider"` // openai, anthropic, google, custom
-	BaseURL     string    `gorm:"type:varchar(500);not null" json:"base_url"`
-	ApiKey      string    `gorm:"type:varchar(500);not null" json:"api_key"`
+	ProviderID  uint      `gorm:"index" json:"provider_id"`
+	ProviderRef *Provider `gorm:"foreignKey:ProviderID" json:"provider_ref,omitempty"`
 	Model       string    `gorm:"type:varchar(100);not null" json:"model"`
 	Temperature float32   `gorm:"default:0.7" json:"temperature"`
 	MaxTokens   int       `gorm:"default:2048" json:"max_tokens"`

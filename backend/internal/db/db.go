@@ -3,6 +3,7 @@ package db
 import (
 	"log"
 	"path/filepath"
+	"strings"
 
 	"fnchatbot/internal/config"
 	"fnchatbot/internal/models"
@@ -53,8 +54,97 @@ func InitDB(dbPath string) {
 	if err := config.InitSystemProviders(DB); err != nil {
 		log.Printf("Failed to initialize system providers: %v", err)
 	}
+	if err := migrateModelConfigProviders(DB); err != nil {
+		log.Printf("Failed to migrate model configs to providers: %v", err)
+	}
 
 	log.Println("Database initialized and migrated successfully")
+}
+
+type legacyModelConfig struct {
+	ID         uint   `gorm:"primaryKey"`
+	Provider   string `gorm:"type:varchar(50)"`
+	BaseURL    string `gorm:"type:varchar(500)"`
+	ApiKey     string `gorm:"type:varchar(500)"`
+	ProviderID *uint  `gorm:"index"`
+}
+
+func (legacyModelConfig) TableName() string {
+	return "model_configs"
+}
+
+func migrateModelConfigProviders(db *gorm.DB) error {
+	var configs []legacyModelConfig
+	if err := db.Find(&configs).Error; err != nil {
+		return err
+	}
+
+	for _, configRow := range configs {
+		if configRow.ProviderID != nil && *configRow.ProviderID > 0 {
+			continue
+		}
+		providerID := strings.TrimSpace(configRow.Provider)
+		if providerID == "" {
+			continue
+		}
+
+		var provider models.Provider
+		result := db.Where("provider_id = ?", providerID).First(&provider)
+		if result.Error != nil {
+			if result.Error != gorm.ErrRecordNotFound {
+				return result.Error
+			}
+			def := config.GetProviderByID(providerID)
+			name := providerID
+			providerType := models.ProviderTypeOpenAI
+			baseURL := configRow.BaseURL
+			apiOptions := models.ProviderApiOptions{}
+			isSystem := false
+			if def != nil {
+				name = def.Name
+				providerType = def.Type
+				apiOptions = def.ApiOptions
+				isSystem = true
+				if baseURL == "" {
+					baseURL = def.BaseURL
+				}
+			}
+			provider = models.Provider{
+				ProviderID: providerID,
+				Name:       name,
+				Type:       providerType,
+				BaseURL:    baseURL,
+				APIKey:     configRow.ApiKey,
+				Enabled:    configRow.ApiKey != "",
+				IsSystem:   isSystem,
+				ApiOptions: apiOptions,
+			}
+			if err := db.Create(&provider).Error; err != nil {
+				return err
+			}
+		} else {
+			updates := map[string]interface{}{}
+			if provider.BaseURL == "" && configRow.BaseURL != "" {
+				updates["base_url"] = configRow.BaseURL
+			}
+			if provider.APIKey == "" && configRow.ApiKey != "" {
+				updates["api_key"] = configRow.ApiKey
+				updates["enabled"] = true
+			}
+			if len(updates) > 0 {
+				if err := db.Model(&provider).Updates(updates).Error; err != nil {
+					return err
+				}
+			}
+		}
+
+		if err := db.Model(&models.ModelConfig{}).
+			Where("id = ?", configRow.ID).
+			Update("provider_id", provider.ID).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func seedSkills() {

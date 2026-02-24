@@ -56,6 +56,7 @@ func setupTestDB() {
 
 	// Migrate schema
 	err = db.DB.AutoMigrate(
+		&models.Provider{},
 		&models.ModelConfig{},
 		&models.Conversation{},
 		&models.Message{},
@@ -69,6 +70,7 @@ func setupTestDB() {
 
 	// Clean up data
 	db.DB.Exec("DELETE FROM model_configs")
+	db.DB.Exec("DELETE FROM providers")
 	db.DB.Exec("DELETE FROM conversations")
 	db.DB.Exec("DELETE FROM messages")
 	db.DB.Exec("DELETE FROM skills")
@@ -97,13 +99,13 @@ func TestChatFlow_Basic(t *testing.T) {
 	defer srv.Close()
 
 	// 1. Add Model
+	providerDBID := ensureProvider(t, "openai", "OpenAI", testBaseURL, testAPIKey)
 	modelConfig := models.ModelConfig{
-		Name:      "Test Model",
-		Provider:  "openai",
-		BaseURL:   testBaseURL,
-		ApiKey:    testAPIKey,
-		Model:     testModelID,
-		IsDefault: true,
+		Name:       "Test Model",
+		Provider:   "openai",
+		ProviderID: providerDBID,
+		Model:      testModelID,
+		IsDefault:  true,
 	}
 
 	modelID := createModel(t, srv.URL, modelConfig)
@@ -162,13 +164,13 @@ func TestChatFlow_WithSkill(t *testing.T) {
 	defer srv.Close()
 
 	// 1. Add Model
+	providerDBID := ensureProvider(t, "openai", "OpenAI", testBaseURL, testAPIKey)
 	modelConfig := models.ModelConfig{
-		Name:      "Test Model",
-		Provider:  "openai",
-		BaseURL:   testBaseURL,
-		ApiKey:    testAPIKey,
-		Model:     testModelID,
-		IsDefault: true,
+		Name:       "Test Model",
+		Provider:   "openai",
+		ProviderID: providerDBID,
+		Model:      testModelID,
+		IsDefault:  true,
 	}
 	modelID := createModel(t, srv.URL, modelConfig)
 
@@ -257,15 +259,15 @@ func TestChatFlow_WithMCP(t *testing.T) {
 			tools := []services.Tool{
 				{
 					Type: "function",
-					Function: services.ToolFunction{
+					Function: services.ToolSchema{
 						Name:        "mcp_echo",
 						Description: "Echo back the input",
-						Parameters: json.RawMessage(`{
+						Parameters: map[string]interface{}{
 							"type": "object",
-							"properties": {
-								"text": {"type": "string"}
-							}
-						}`),
+							"properties": map[string]interface{}{
+								"text": map[string]interface{}{"type": "string"},
+							},
+						},
 					},
 				},
 			}
@@ -292,13 +294,13 @@ func TestChatFlow_WithMCP(t *testing.T) {
 	defer mcpServer.Close()
 
 	// 2. Add Model
+	providerDBID := ensureProvider(t, "openai", "OpenAI", testBaseURL, testAPIKey)
 	modelConfig := models.ModelConfig{
-		Name:      "Test Model",
-		Provider:  "openai",
-		BaseURL:   testBaseURL,
-		ApiKey:    testAPIKey,
-		Model:     testModelID,
-		IsDefault: true,
+		Name:       "Test Model",
+		Provider:   "openai",
+		ProviderID: providerDBID,
+		Model:      testModelID,
+		IsDefault:  true,
 	}
 	modelID := createModel(t, srv.URL, modelConfig)
 
@@ -390,4 +392,38 @@ func createConversation(t *testing.T, baseURL string, title string, modelID uint
 	var conv models.Conversation
 	json.NewDecoder(resp.Body).Decode(&conv)
 	return conv.ID
+}
+
+func ensureProvider(t *testing.T, providerID string, name string, baseURL string, apiKey string) uint {
+	var provider models.Provider
+	result := db.DB.Where("provider_id = ?", providerID).First(&provider)
+	if result.Error == nil {
+		updates := map[string]interface{}{
+			"name":     name,
+			"base_url": baseURL,
+			"api_key":  apiKey,
+			"enabled":  true,
+		}
+		if err := db.DB.Model(&provider).Updates(updates).Error; err != nil {
+			t.Fatalf("Failed to update provider: %v", err)
+		}
+		return provider.ID
+	}
+	if result.Error != gorm.ErrRecordNotFound {
+		t.Fatalf("Failed to query provider: %v", result.Error)
+	}
+
+	provider = models.Provider{
+		ProviderID: providerID,
+		Name:       name,
+		Type:       models.ProviderTypeOpenAI,
+		BaseURL:    baseURL,
+		APIKey:     apiKey,
+		Enabled:    true,
+		IsSystem:   false,
+	}
+	if err := db.DB.Create(&provider).Error; err != nil {
+		t.Fatalf("Failed to create provider: %v", err)
+	}
+	return provider.ID
 }
