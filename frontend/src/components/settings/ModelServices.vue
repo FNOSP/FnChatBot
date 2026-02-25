@@ -148,6 +148,7 @@ const fetchProviders = async () => {
   try {
     const res = await axios.get(`${API_BASE}/providers`)
     const backendProviders = normalizeProvidersResponse(res.data)
+    // #endregion
     
     const mergedProviders: Provider[] = predefinedProviders.map(predefined => {
       const existing = backendProviders.find(bp => bp.provider_id === predefined.id)
@@ -394,7 +395,11 @@ watch(selectedProviderId, () => {
 <template>
   <div class="model-services h-full text-foreground" :class="isDark ? 'bg-zinc-900' : 'bg-white'">
     <Layout class="h-full border rounded-lg overflow-hidden" :class="isDark ? 'bg-zinc-900' : 'bg-white'">
-      <LayoutSider class="w-72 border-r flex flex-col" :class="isDark ? 'bg-zinc-900/50' : 'bg-gray-50'">
+      <LayoutSider
+        class="border-r flex flex-col"
+        :class="isDark ? 'bg-zinc-900/50' : 'bg-gray-50'"
+        :style="{ width: '18rem', minWidth: '18rem' }"
+      >
         <div class="p-4 border-b" :class="isDark ? 'border-zinc-700' : 'border-gray-200'">
           <TypographyTitle :heading="5" class="mb-3">{{ t('settings.providers') }}</TypographyTitle>
           <Input
@@ -406,13 +411,12 @@ watch(selectedProviderId, () => {
           />
         </div>
         
-        <Spin :spinning="loading">
-          <List
-            :dataSource="filteredProviders"
-            class="flex-1 overflow-y-auto provider-list"
-          >
-            <template #renderItem="{ item }">
+        <div class="flex-1 min-h-0 overflow-y-auto">
+          <Spin :spinning="loading">
+            <List class="provider-list">
               <ListItem
+                v-for="item in filteredProviders"
+                :key="item.provider_id"
                 :class="[
                   'cursor-pointer transition-colors border-l-2',
                   isDark ? 'hover:bg-white/5 border-transparent' : 'hover:bg-black/5 border-transparent',
@@ -447,9 +451,9 @@ watch(selectedProviderId, () => {
                   />
                 </div>
               </ListItem>
-            </template>
-          </List>
-        </Spin>
+            </List>
+          </Spin>
+        </div>
       </LayoutSider>
 
       <LayoutContent :class="isDark ? 'bg-zinc-900' : 'bg-white'">

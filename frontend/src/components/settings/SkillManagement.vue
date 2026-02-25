@@ -159,12 +159,10 @@ onMounted(() => {
 
         <List
             v-else
-            :dataSource="skills"
             bordered
             class="bg-card rounded-lg"
         >
-            <template #renderItem="{ item }">
-                <ListItem class="hover:bg-accent/50 transition-colors">
+                <ListItem v-for="item in skills" :key="item.id" class="hover:bg-accent/50 transition-colors">
                     <div class="flex items-center gap-3">
                         <div class="p-2 bg-muted rounded">
                             <IconWrench />
@@ -195,7 +193,6 @@ onMounted(() => {
                         </Space>
                     </template>
                 </ListItem>
-            </template>
         </List>
     </Spin>
 

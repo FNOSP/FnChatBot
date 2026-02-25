@@ -169,12 +169,10 @@ onMounted(() => {
 
             <List
               v-else
-              :dataSource="paths"
               bordered
               class="bg-transparent"
             >
-              <template #renderItem="{ item }">
-                <ListItem class="hover:bg-accent/50 transition-colors">
+                <ListItem v-for="item in paths" :key="item.path" class="hover:bg-accent/50 transition-colors">
                   <div class="flex flex-col">
                     <div class="font-medium">{{ item.path }}</div>
                     <div class="text-sm text-muted-foreground">{{ item.description || '-' }}</div>
@@ -188,7 +186,6 @@ onMounted(() => {
                     />
                   </template>
                 </ListItem>
-              </template>
             </List>
           </div>
         </div>
