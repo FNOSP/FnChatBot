@@ -2,7 +2,10 @@ package memory
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"strings"
 
 	"fnchatbot/internal/models"
 
@@ -52,37 +55,93 @@ func (h *SQLiteHistory) AddMessage(ctx context.Context, message llms.ChatMessage
 
 	var parts []models.Part
 
-	// Add content part
-	if content := message.GetContent(); content != "" {
-		partType := "text"
-		var meta datatypes.JSON
-
-		// Handle ToolCallID for Tool messages
-		if toolMsg, ok := message.(llms.ToolChatMessage); ok && toolMsg.ID != "" {
-			partType = "tool_result"
-			metaJSON, _ := json.Marshal(map[string]interface{}{
-				"tool_call_id": toolMsg.ID,
-			})
-			meta = datatypes.JSON(metaJSON)
+	// Helper to add part
+	addPart := func(pType models.PartType, content string, meta interface{}) {
+		var metaJSON datatypes.JSON
+		if meta != nil {
+			b, _ := json.Marshal(meta)
+			metaJSON = datatypes.JSON(b)
 		}
-
 		parts = append(parts, models.Part{
 			MessageID: msg.ID,
-			Type:      partType,
+			Type:      pType,
 			Content:   content,
-			Meta:      meta,
+			Meta:      metaJSON,
 		})
+	}
+
+	// Iterate message parts if available
+	var messageParts []llms.ContentPart
+	switch m := message.(type) {
+	case MultiModalMessage:
+		messageParts = m.Parts
+	}
+
+	hasContent := false
+
+	if len(messageParts) > 0 {
+		for _, p := range messageParts {
+			switch part := p.(type) {
+			case llms.TextContent:
+				addPart(models.PartTypeText, part.Text, nil)
+				hasContent = true
+			case llms.ImageURLContent:
+				content := part.URL
+				mime := "image/jpeg"
+				filename := "image.jpg"
+
+				// Check for data URL
+				if strings.HasPrefix(content, "data:") {
+					parts := strings.Split(content, ",")
+					if len(parts) == 2 {
+						metaPart := parts[0]
+						dataPart := parts[1]
+						if strings.Contains(metaPart, ";") {
+							mime = strings.TrimPrefix(strings.Split(metaPart, ";")[0], "data:")
+						}
+						content = dataPart
+					}
+				}
+
+				addPart(models.PartTypeFile, content, models.FilePartMeta{
+					Mime:     mime,
+					Filename: filename,
+				})
+				hasContent = true
+			case llms.BinaryContent:
+				encoded := base64.StdEncoding.EncodeToString(part.Data)
+				addPart(models.PartTypeFile, encoded, models.FilePartMeta{
+					Mime:     part.MIMEType,
+					Filename: "file.bin",
+				})
+				hasContent = true
+			}
+		}
+	}
+
+	// Fallback to simple content if no parts processed
+	if !hasContent {
+		if content := message.GetContent(); content != "" {
+			partType := models.PartTypeText
+			var meta interface{}
+
+			// Handle ToolCallID for Tool messages
+			if toolMsg, ok := message.(llms.ToolChatMessage); ok && toolMsg.ID != "" {
+				partType = models.PartTypeToolResult
+				meta = map[string]interface{}{
+					"tool_call_id": toolMsg.ID,
+				}
+			}
+
+			addPart(partType, content, meta)
+		}
 	}
 
 	// Handle ToolCalls for AI messages
 	if aiMsg, ok := message.(llms.AIChatMessage); ok && len(aiMsg.ToolCalls) > 0 {
 		toolCallsJSON, err := json.Marshal(aiMsg.ToolCalls)
 		if err == nil {
-			parts = append(parts, models.Part{
-				MessageID: msg.ID,
-				Type:      "tool_calls",
-				Content:   string(toolCallsJSON),
-			})
+			addPart(models.PartTypeToolCall, string(toolCallsJSON), nil)
 		}
 	}
 
@@ -116,18 +175,30 @@ func (h *SQLiteHistory) Messages(ctx context.Context) ([]llms.ChatMessage, error
 
 	var chatMessages []llms.ChatMessage
 	for _, msg := range dbMessages {
-		var content string
+		var parts []llms.ContentPart
 		var toolCalls []llms.ToolCall
 		var toolCallID string
+		var contentStr string
 
 		for _, part := range msg.Parts {
 			switch part.Type {
-			case "text":
-				content += part.Content
-			case "tool_calls":
+			case models.PartTypeText:
+				parts = append(parts, llms.TextPart(part.Content))
+				contentStr += part.Content
+			case models.PartTypeFile:
+				var meta models.FilePartMeta
+				_ = json.Unmarshal(part.Meta, &meta)
+
+				url := part.Content
+				if meta.Mime != "" {
+					url = fmt.Sprintf("data:%s;base64,%s", meta.Mime, part.Content)
+				}
+				parts = append(parts, llms.ImageURLPart(url))
+			case models.PartTypeToolCall:
 				_ = json.Unmarshal([]byte(part.Content), &toolCalls)
-			case "tool_result":
-				content += part.Content
+			case models.PartTypeToolResult:
+				parts = append(parts, llms.TextPart(part.Content))
+				contentStr += part.Content
 				if len(part.Meta) > 0 {
 					var meta map[string]interface{}
 					_ = json.Unmarshal(part.Meta, &meta)
@@ -141,28 +212,69 @@ func (h *SQLiteHistory) Messages(ctx context.Context) ([]llms.ChatMessage, error
 		var chatMsg llms.ChatMessage
 		switch msg.Role {
 		case models.RoleUser:
-			chatMsg = llms.HumanChatMessage{Content: content}
+			if len(parts) > 0 {
+				chatMsg = MultiModalMessage{
+					Type:    llms.ChatMessageTypeHuman,
+					Content: contentStr,
+					Parts:   parts,
+				}
+			} else {
+				chatMsg = llms.HumanChatMessage{
+					Content: contentStr,
+				}
+			}
 		case models.RoleAssistant:
-			aiMsg := llms.AIChatMessage{Content: content}
+			aiMsg := llms.AIChatMessage{
+				Content: contentStr,
+			}
 			if len(toolCalls) > 0 {
 				aiMsg.ToolCalls = toolCalls
 			}
 			chatMsg = aiMsg
 		case models.RoleSystem:
-			chatMsg = llms.SystemChatMessage{Content: content}
+			if len(parts) > 0 {
+				chatMsg = MultiModalMessage{
+					Type:    llms.ChatMessageTypeSystem,
+					Content: contentStr,
+					Parts:   parts,
+				}
+			} else {
+				chatMsg = llms.SystemChatMessage{
+					Content: contentStr,
+				}
+			}
 		case "tool":
-			toolMsg := llms.ToolChatMessage{Content: content}
+			toolMsg := llms.ToolChatMessage{
+				Content: contentStr,
+			}
 			if toolCallID != "" {
 				toolMsg.ID = toolCallID
 			}
 			chatMsg = toolMsg
 		default:
-			chatMsg = llms.HumanChatMessage{Content: content}
+			chatMsg = llms.HumanChatMessage{
+				Content: contentStr,
+			}
 		}
 		chatMessages = append(chatMessages, chatMsg)
 	}
 
 	return chatMessages, nil
+}
+
+// MultiModalMessage represents a message with multiple parts (text, image, etc.)
+type MultiModalMessage struct {
+	Type    llms.ChatMessageType
+	Content string
+	Parts   []llms.ContentPart
+}
+
+func (m MultiModalMessage) GetType() llms.ChatMessageType {
+	return m.Type
+}
+
+func (m MultiModalMessage) GetContent() string {
+	return m.Content
 }
 
 // SetMessages sets the messages in the history

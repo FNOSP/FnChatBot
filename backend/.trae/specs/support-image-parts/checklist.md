@@ -1,0 +1,5 @@
+- [x] `PartType` constants are defined and used in `models.go`.
+- [x] `AddMessage` correctly saves text parts with `PartTypeText`.
+- [x] `AddMessage` correctly saves image parts with `PartTypeFile`, base64 content, and correct metadata.
+- [x] WebSocket handler can parse a message with an image and pass it to the service layer.
+- [x] `GetHistory` (or `Messages` method) correctly reconstructs `llms.ImageURLPart` or equivalent from stored Parts.

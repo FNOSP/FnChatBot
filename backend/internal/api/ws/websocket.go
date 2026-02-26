@@ -31,11 +31,13 @@ const (
 	TypeMessage            = "message"
 	TypeMessageEnd         = "message_end"
 	TypePermissionResponse = "permission_response"
+	TypeImage              = "image"
 )
 
 type WSMessage struct {
 	Type          string         `json:"type"`
 	Content       string         `json:"content,omitempty"`
+	Images        []ImagePayload `json:"images,omitempty"`
 	ModelID       uint           `json:"model_id,omitempty"`
 	Options       map[string]any `json:"options,omitempty"`
 	Delta         string         `json:"delta,omitempty"`
@@ -46,6 +48,11 @@ type WSMessage struct {
 	BlockedPaths  []string       `json:"blocked_paths,omitempty"`
 	Approved      bool           `json:"approved,omitempty"`
 	Remember      bool           `json:"remember,omitempty"`
+}
+
+type ImagePayload struct {
+	Data string `json:"data"`
+	Type string `json:"type"`
 }
 
 type TaskDTO struct {
@@ -126,6 +133,8 @@ func HandleWebSocket(c *gin.Context) {
 
 		switch msg.Type {
 		case TypeUserMessage:
+			handleUserMessage(conn, sessionID, msg)
+		case TypeImage:
 			handleUserMessage(conn, sessionID, msg)
 		case TypePermissionResponse:
 			HandlePermissionResponse(msg)
@@ -217,7 +226,17 @@ func handleUserMessage(conn *websocket.Conn, sessionIDStr string, msg WSMessage)
 
 		// Convert History to []llms.MessageContent
 		var contentMessages []llms.MessageContent
-		for _, m := range history {
+
+		// Find the index of the last human message to attach images to
+		lastHumanIdx := -1
+		for j := len(history) - 1; j >= 0; j-- {
+			if history[j].GetType() == llms.ChatMessageTypeHuman {
+				lastHumanIdx = j
+				break
+			}
+		}
+
+		for i, m := range history {
 			parts := []llms.ContentPart{}
 
 			// Handle Tool Calls
@@ -242,8 +261,23 @@ func handleUserMessage(conn *websocket.Conn, sessionIDStr string, msg WSMessage)
 					Name:       "", // Name is not stored in ToolChatMessage
 				})
 			} else {
-				// Normal text message
-				parts = append(parts, llms.TextPart(m.GetContent()))
+				// Normal text message or Human message with images
+				if i == lastHumanIdx && len(msg.Images) > 0 && m.GetType() == llms.ChatMessageTypeHuman {
+					content := m.GetContent()
+					if content != "" {
+						parts = append(parts, llms.TextPart(content))
+					}
+					for _, img := range msg.Images {
+						mimeType := img.Type
+						if mimeType == "" {
+							mimeType = "image/png"
+						}
+						url := fmt.Sprintf("data:%s;base64,%s", mimeType, img.Data)
+						parts = append(parts, llms.ImageURLPart(url))
+					}
+				} else {
+					parts = append(parts, llms.TextPart(m.GetContent()))
+				}
 			}
 
 			contentMessages = append(contentMessages, llms.MessageContent{

@@ -49,14 +49,30 @@ type Message struct {
 	CreatedAt time.Time   `gorm:"index" json:"created_at"`
 }
 
+// PartType defines the type of message part
+type PartType string
+
+const (
+	PartTypeText       PartType = "text"
+	PartTypeFile       PartType = "file"
+	PartTypeToolCall   PartType = "tool_calls"
+	PartTypeToolResult PartType = "tool_result"
+)
+
 // Part represents a part of a message content
 type Part struct {
 	ID        uint           `gorm:"primaryKey" json:"id"`
 	MessageID uint           `gorm:"index;not null" json:"message_id"`
-	Type      string         `gorm:"type:varchar(50);not null" json:"type"` // e.g., text, image, tool_use, tool_result
+	Type      PartType       `gorm:"type:varchar(50);not null" json:"type"`
 	Content   string         `gorm:"type:text;not null" json:"content"`
 	Meta      datatypes.JSON `json:"meta"`
 	CreatedAt time.Time      `json:"created_at"`
+}
+
+// FilePartMeta defines metadata for file parts
+type FilePartMeta struct {
+	Mime     string `json:"mime"`
+	Filename string `json:"filename"`
 }
 
 // MCPConfig and Skill moved to separate files
