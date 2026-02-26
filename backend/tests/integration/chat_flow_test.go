@@ -58,8 +58,9 @@ func setupTestDB() {
 	err = db.DB.AutoMigrate(
 		&models.Provider{},
 		&models.ModelConfig{},
-		&models.Conversation{},
+		&models.Session{},
 		&models.Message{},
+		&models.Part{},
 		&models.Skill{},
 		&models.MCPConfig{},
 		&models.AgentTask{},
@@ -71,8 +72,9 @@ func setupTestDB() {
 	// Clean up data
 	db.DB.Exec("DELETE FROM model_configs")
 	db.DB.Exec("DELETE FROM providers")
-	db.DB.Exec("DELETE FROM conversations")
+	db.DB.Exec("DELETE FROM sessions")
 	db.DB.Exec("DELETE FROM messages")
+	db.DB.Exec("DELETE FROM parts")
 	db.DB.Exec("DELETE FROM skills")
 	db.DB.Exec("DELETE FROM mcp_configs")
 }
@@ -110,11 +112,11 @@ func TestChatFlow_Basic(t *testing.T) {
 
 	modelID := createModel(t, srv.URL, modelConfig)
 
-	// 2. Create Conversation
-	convID := createConversation(t, srv.URL, "Test Chat", modelID)
+	// 2. Create Session
+	sessionID := createSession(t, srv.URL, "Test Chat", modelID)
 
 	// 3. WebSocket Chat
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/chat/" + fmt.Sprintf("%d", convID)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/chat/" + fmt.Sprintf("%d", sessionID)
 	wsConn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect to WebSocket: %v", err)
@@ -198,11 +200,11 @@ func TestChatFlow_WithSkill(t *testing.T) {
 		t.Fatalf("Failed to create skill: %v", err)
 	}
 
-	// 3. Create Conversation
-	convID := createConversation(t, srv.URL, "Skill Chat", modelID)
+	// 3. Create Session
+	sessionID := createSession(t, srv.URL, "Skill Chat", modelID)
 
 	// 4. Connect WS
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/chat/" + fmt.Sprintf("%d", convID)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/chat/" + fmt.Sprintf("%d", sessionID)
 	wsConn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect to WebSocket: %v", err)
@@ -314,11 +316,11 @@ func TestChatFlow_WithMCP(t *testing.T) {
 		t.Fatalf("Failed to create MCP config: %v", err)
 	}
 
-	// 4. Create Conversation
-	convID := createConversation(t, srv.URL, "MCP Chat", modelID)
+	// 4. Create Session
+	sessionID := createSession(t, srv.URL, "MCP Chat", modelID)
 
 	// 5. Connect WS
-	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/chat/" + fmt.Sprintf("%d", convID)
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http") + "/ws/chat/" + fmt.Sprintf("%d", sessionID)
 	wsConn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
 	if err != nil {
 		t.Fatalf("Failed to connect to WebSocket: %v", err)
@@ -374,7 +376,7 @@ func createModel(t *testing.T, baseURL string, config models.ModelConfig) uint {
 	return model.ID
 }
 
-func createConversation(t *testing.T, baseURL string, title string, modelID uint) uint {
+func createSession(t *testing.T, baseURL string, title string, modelID uint) uint {
 	input := map[string]interface{}{
 		"title":    title,
 		"model_id": modelID,
@@ -382,16 +384,16 @@ func createConversation(t *testing.T, baseURL string, title string, modelID uint
 	body, _ := json.Marshal(input)
 	resp, err := http.Post(baseURL+"/api/conversations", "application/json", bytes.NewBuffer(body))
 	if err != nil {
-		t.Fatalf("Failed to create conversation: %v", err)
+		t.Fatalf("Failed to create session: %v", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("Create conversation returned status: %d", resp.StatusCode)
+		t.Fatalf("Create session returned status: %d", resp.StatusCode)
 	}
 
-	var conv models.Conversation
-	json.NewDecoder(resp.Body).Decode(&conv)
-	return conv.ID
+	var session models.Session
+	json.NewDecoder(resp.Body).Decode(&session)
+	return session.ID
 }
 
 func ensureProvider(t *testing.T, providerID string, name string, baseURL string, apiKey string) uint {

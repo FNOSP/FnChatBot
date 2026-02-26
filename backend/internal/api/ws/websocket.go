@@ -1,25 +1,22 @@
 package ws
 
 import (
-	"bufio"
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
-	"net/http"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-
 	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
 	"fnchatbot/internal/services"
+	"fnchatbot/internal/services/llm"
+	"fnchatbot/internal/services/memory"
+	"log"
+	"net/http"
+	"strconv"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"gorm.io/datatypes"
+	"github.com/tmc/langchaingo/llms"
 )
 
 var upgrader = websocket.Upgrader{
@@ -30,13 +27,10 @@ var upgrader = websocket.Upgrader{
 
 const (
 	TypeUserMessage        = "user_message"
-	TypeThinking           = "thinking"
 	TypeTaskUpdate         = "task_update"
 	TypeMessage            = "message"
 	TypeMessageEnd         = "message_end"
-	TypePermissionRequest  = "permission_request"
 	TypePermissionResponse = "permission_response"
-	TypeCommandBlocked     = "command_blocked"
 )
 
 type WSMessage struct {
@@ -52,52 +46,6 @@ type WSMessage struct {
 	BlockedPaths  []string       `json:"blocked_paths,omitempty"`
 	Approved      bool           `json:"approved,omitempty"`
 	Remember      bool           `json:"remember,omitempty"`
-}
-
-type ChatMessage struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content"`
-	ToolCalls  []ToolCall `json:"tool_calls,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
-	Name       string     `json:"name,omitempty"`
-}
-
-type ToolCall struct {
-	Index    int      `json:"index"`
-	ID       string   `json:"id,omitempty"`
-	Type     string   `json:"type"`
-	Function ToolFunc `json:"function"`
-}
-
-type ToolFunc struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
-}
-
-type ChatCompletionRequest struct {
-	Model       string          `json:"model"`
-	Messages    []ChatMessage   `json:"messages"`
-	Stream      bool            `json:"stream"`
-	Temperature float32         `json:"temperature,omitempty"`
-	MaxTokens   int             `json:"max_tokens,omitempty"`
-	Tools       []services.Tool `json:"tools,omitempty"`
-}
-
-type ChatCompletionStreamResponse struct {
-	ID      string `json:"id"`
-	Object  string `json:"object"`
-	Created int64  `json:"created"`
-	Model   string `json:"model"`
-	Choices []struct {
-		Index        int         `json:"index"`
-		Delta        StreamDelta `json:"delta"`
-		FinishReason string      `json:"finish_reason"`
-	} `json:"choices"`
-}
-
-type StreamDelta struct {
-	Content   string     `json:"content"`
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 }
 
 type TaskDTO struct {
@@ -154,34 +102,8 @@ func (pm *PermissionManager) RemoveRequest(requestID string) {
 	delete(pm.responses, requestID)
 }
 
-type SandboxService struct {
-	blockedPaths map[string]bool
-}
-
-func NewSandboxService() *SandboxService {
-	return &SandboxService{
-		blockedPaths: map[string]bool{
-			"/etc/passwd":       true,
-			"/etc/shadow":       true,
-			"/root":             true,
-			"/var/log":          true,
-			"C:\\Windows":       true,
-			"C:\\Program Files": true,
-		},
-	}
-}
-
-func (s *SandboxService) CheckCommandPermission(command string, paths []string) (allowed bool, blockedPaths []string) {
-	for _, path := range paths {
-		if s.blockedPaths[path] {
-			blockedPaths = append(blockedPaths, path)
-		}
-	}
-	return len(blockedPaths) == 0, blockedPaths
-}
-
 func HandleWebSocket(c *gin.Context) {
-	conversationID := c.Param("id")
+	sessionID := c.Param("id")
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Printf("Failed to upgrade websocket: %v", err)
@@ -204,331 +126,286 @@ func HandleWebSocket(c *gin.Context) {
 
 		switch msg.Type {
 		case TypeUserMessage:
-			handleUserMessage(conn, conversationID, msg)
+			handleUserMessage(conn, sessionID, msg)
 		case TypePermissionResponse:
-			HandlePermissionResponse(conn, msg)
+			HandlePermissionResponse(msg)
 		}
 	}
 }
 
-func handleUserMessage(conn *websocket.Conn, conversationIDStr string, msg WSMessage) {
-	// Parse conversation ID
-	conversationID, err := strconv.ParseUint(conversationIDStr, 10, 32)
+func handleUserMessage(conn *websocket.Conn, sessionIDStr string, msg WSMessage) {
+	sessionID, err := strconv.ParseUint(sessionIDStr, 10, 32)
 	if err != nil {
-		log.Printf("Invalid conversation ID: %v", err)
+		log.Printf("Invalid session ID: %v", err)
 		return
 	}
 
-	// Fetch conversation and model config
-	var conversation models.Conversation
-	if err := db.DB.Preload("Model").Preload("Model.ProviderRef").First(&conversation, uint(conversationID)).Error; err != nil {
-		log.Printf("Conversation not found: %v", err)
-		sendJSON(conn, WSMessage{
-			Type:    TypeMessage,
-			Content: "Error: Conversation not found.",
-		})
-		sendJSON(conn, WSMessage{Type: TypeMessageEnd})
+	var session models.Session
+	if err := db.DB.Preload("Model").Preload("Model.ProviderRef").First(&session, uint(sessionID)).Error; err != nil {
+		log.Printf("Session not found: %v", err)
+		if err := sendJSON(conn, WSMessage{Type: TypeMessage, Content: "Error: Session not found."}); err != nil {
+			log.Printf("Failed to send error message: %v", err)
+		}
+		if err := sendJSON(conn, WSMessage{Type: TypeMessageEnd}); err != nil {
+			log.Printf("Failed to send message end: %v", err)
+		}
 		return
 	}
 
-	// Check if model config exists
-	if conversation.Model.ID == 0 {
-		log.Printf("Model configuration not found for conversation %d", conversationID)
-		sendJSON(conn, WSMessage{
-			Type:    TypeMessage,
-			Content: "Error: Model configuration not found. Please select a model for this conversation.",
-		})
-		sendJSON(conn, WSMessage{Type: TypeMessageEnd})
+	if session.Model.ID == 0 {
+		log.Printf("Model configuration not found for session %d", sessionID)
+		if err := sendJSON(conn, WSMessage{Type: TypeMessage, Content: "Error: Model configuration not found."}); err != nil {
+			log.Printf("Failed to send error message: %v", err)
+		}
+		if err := sendJSON(conn, WSMessage{Type: TypeMessageEnd}); err != nil {
+			log.Printf("Failed to send message end: %v", err)
+		}
 		return
 	}
 
-	// Save user message
-	saveMessage(uint(conversationID), "user", msg.Content)
-
-	// Fetch conversation history
-	var historyMessages []models.Message
-	if err := db.DB.Where("conversation_id = ?", conversationID).Order("created_at asc").Find(&historyMessages).Error; err != nil {
-		log.Printf("Failed to fetch history: %v", err)
-	}
-
-	// Convert history to ChatMessage
-	var messages []ChatMessage
-	for _, m := range historyMessages {
-		// Note: Detailed tool calls reconstruction from DB is complex if not stored properly.
-		// For simplicity, we assume simple text messages here, or valid JSON in Meta if we implemented that.
-		// Current DB schema stores Content as string.
-		messages = append(messages, ChatMessage{
-			Role:    string(m.Role),
-			Content: m.Content,
-		})
-	}
-
-	// Stream chat completion
-	responseContent, err := streamChatCompletion(conversation.Model, messages, conn)
-	if err != nil {
-		log.Printf("Error streaming chat completion: %v", err)
-		sendJSON(conn, WSMessage{
-			Type:    TypeMessage,
-			Content: fmt.Sprintf("\n\nError: %v", err),
-		})
-	}
-
-	// Save assistant message
-	if responseContent != "" {
-		saveMessage(uint(conversationID), "assistant", responseContent)
-	}
-
-	sendJSON(conn, WSMessage{
-		Type: TypeMessageEnd,
-	})
-}
-
-func streamChatCompletion(config models.ModelConfig, messages []ChatMessage, conn *websocket.Conn) (string, error) {
+	// Determine provider
 	var provider models.Provider
-	if config.ProviderRef != nil {
-		provider = *config.ProviderRef
-	} else if config.ProviderID != 0 {
-		if err := db.DB.First(&provider, config.ProviderID).Error; err != nil {
-			return "", fmt.Errorf("provider not found: %v", err)
+	if session.Model.ProviderRef != nil {
+		provider = *session.Model.ProviderRef
+	} else if session.Model.ProviderID != 0 {
+		if err := db.DB.First(&provider, session.Model.ProviderID).Error; err != nil {
+			log.Printf("Provider not found: %v", err)
+			if err := sendJSON(conn, WSMessage{Type: TypeMessage, Content: "Error: Provider not found."}); err != nil {
+				log.Printf("Failed to send error message: %v", err)
+			}
+			if err := sendJSON(conn, WSMessage{Type: TypeMessageEnd}); err != nil {
+				log.Printf("Failed to send message end: %v", err)
+			}
+			return
 		}
 	} else {
-		return "", fmt.Errorf("provider not configured for model")
+		if err := sendJSON(conn, WSMessage{Type: TypeMessage, Content: "Error: Provider not configured."}); err != nil {
+			log.Printf("Failed to send error message: %v", err)
+		}
+		if err := sendJSON(conn, WSMessage{Type: TypeMessageEnd}); err != nil {
+			log.Printf("Failed to send message end: %v", err)
+		}
+		return
 	}
 
-	if provider.BaseURL == "" {
-		return "", fmt.Errorf("provider base URL is empty")
-	}
-	if provider.APIKey == "" {
-		return "", fmt.Errorf("provider API key is empty")
+	ctx := context.Background()
+	llmService := llm.NewService(db.DB)
+
+	// Save User Message
+	if err := llmService.SaveUserMessage(ctx, uint(sessionID), msg.Content); err != nil {
+		log.Printf("Failed to save user message: %v", err)
 	}
 
-	baseURL := strings.TrimSuffix(provider.BaseURL, "/")
-	if !strings.HasSuffix(baseURL, "/v1") {
-		baseURL += "/v1"
-	}
-	url := fmt.Sprintf("%s/chat/completions", baseURL)
-
-	// Get Tools
+	// Prepare Tools
 	toolService := services.NewToolService()
-	tools, err := toolService.GetAvailableTools()
-	if err != nil {
-		log.Printf("Failed to get tools: %v", err)
-		// Proceed without tools if failed
-	}
+	svcTools, _ := toolService.GetAvailableTools()
+	lcTools := convertToLangChainTools(svcTools)
 
-	client := &http.Client{}
-	var fullResponse strings.Builder
-
-	// Maximum turns to prevent infinite loops
+	// Loop for Multi-turn (Tool Execution)
 	maxTurns := 5
 	currentTurn := 0
 
 	for currentTurn < maxTurns {
 		currentTurn++
 
-		reqBody := ChatCompletionRequest{
-			Model:       config.Model,
-			Messages:    messages,
-			Stream:      true,
-			Temperature: config.Temperature,
-			MaxTokens:   config.MaxTokens,
-		}
-
-		if len(tools) > 0 {
-			reqBody.Tools = tools
-		}
-
-		jsonBody, err := json.Marshal(reqBody)
+		// Load History (including just saved user message or previous tool outputs)
+		history, err := llmService.GetHistory(ctx, uint(sessionID))
 		if err != nil {
-			return "", fmt.Errorf("failed to marshal request: %v", err)
-		}
-
-		req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonBody))
-		if err != nil {
-			return "", fmt.Errorf("failed to create request: %v", err)
-		}
-
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", provider.APIKey))
-
-		resp, err := client.Do(req)
-		if err != nil {
-			return "", fmt.Errorf("failed to send request: %v", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			bodyBytes, _ := io.ReadAll(resp.Body)
-			return "", fmt.Errorf("API returned status %d: %s", resp.StatusCode, string(bodyBytes))
-		}
-
-		reader := bufio.NewReader(resp.Body)
-
-		var currentToolCalls map[int]*ToolCall = make(map[int]*ToolCall)
-
-		for {
-			line, err := reader.ReadString('\n')
-			if err != nil {
-				if err == io.EOF {
-					break
-				}
-				return fullResponse.String(), fmt.Errorf("error reading stream: %v", err)
-			}
-
-			line = strings.TrimSpace(line)
-			if !strings.HasPrefix(line, "data: ") {
-				continue
-			}
-
-			data := strings.TrimPrefix(line, "data: ")
-			if data == "[DONE]" {
-				break
-			}
-
-			var streamResp ChatCompletionStreamResponse
-			if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
-				log.Printf("Error unmarshaling stream response: %v", err)
-				continue
-			}
-
-			if len(streamResp.Choices) > 0 {
-				choice := streamResp.Choices[0]
-
-				// Handle Content
-				delta := choice.Delta.Content
-				if delta != "" {
-					fullResponse.WriteString(delta)
-					sendJSON(conn, WSMessage{
-						Type:  TypeMessage,
-						Delta: delta,
-					})
-				}
-
-				// Handle Tool Calls
-				for _, tc := range choice.Delta.ToolCalls {
-					if _, exists := currentToolCalls[tc.Index]; !exists {
-						currentToolCalls[tc.Index] = &ToolCall{
-							Index: tc.Index,
-							ID:    tc.ID,
-							Type:  tc.Type,
-							Function: ToolFunc{
-								Name:      tc.Function.Name,
-								Arguments: "",
-							},
-						}
-					}
-
-					// Append arguments
-					currentToolCalls[tc.Index].Function.Arguments += tc.Function.Arguments
-					// Update name if present (usually only in first chunk)
-					if tc.Function.Name != "" {
-						currentToolCalls[tc.Index].Function.Name = tc.Function.Name
-					}
-				}
-			}
-		}
-
-		// If no tool calls, we are done
-		if len(currentToolCalls) == 0 {
+			log.Printf("Failed to load history: %v", err)
 			break
 		}
 
-		// If we have tool calls, we need to execute them and continue the conversation
-		log.Printf("Tool calls detected: %d", len(currentToolCalls))
+		// Convert History to []llms.MessageContent
+		var contentMessages []llms.MessageContent
+		for _, m := range history {
+			parts := []llms.ContentPart{}
 
-		// 1. Add assistant message with tool calls to history
-		var toolCalls []ToolCall
-		for i := 0; i < len(currentToolCalls); i++ {
-			if tc, ok := currentToolCalls[i]; ok {
-				toolCalls = append(toolCalls, *tc)
+			// Handle Tool Calls
+			if aiMsg, ok := m.(llms.AIChatMessage); ok && len(aiMsg.ToolCalls) > 0 {
+				// For AI message with tool calls, we usually don't have text content in LangChain's view if it's purely a tool call,
+				// but sometimes it has both.
+				if aiMsg.Content != "" {
+					parts = append(parts, llms.TextPart(aiMsg.Content))
+				}
+				for _, tc := range aiMsg.ToolCalls {
+					parts = append(parts, llms.ToolCall{
+						ID:           tc.ID,
+						Type:         tc.Type,
+						FunctionCall: tc.FunctionCall,
+					})
+				}
+			} else if toolMsg, ok := m.(llms.ToolChatMessage); ok {
+				// For Tool output
+				parts = append(parts, llms.ToolCallResponse{
+					ToolCallID: toolMsg.ID,
+					Content:    toolMsg.Content,
+					Name:       "", // Name is not stored in ToolChatMessage
+				})
+			} else {
+				// Normal text message
+				parts = append(parts, llms.TextPart(m.GetContent()))
 			}
+
+			contentMessages = append(contentMessages, llms.MessageContent{
+				Role:  m.GetType(),
+				Parts: parts,
+			})
 		}
 
-		messages = append(messages, ChatMessage{
-			Role:      "assistant",
-			Content:   "", // Tool calls usually have empty content
-			ToolCalls: toolCalls,
+		// Stream Chat
+		resp, err := llmService.StreamChat(ctx, provider, session.Model.Model, contentMessages, lcTools, func(ctx context.Context, chunk []byte) error {
+			if err := sendJSON(conn, WSMessage{
+				Type:  TypeMessage,
+				Delta: string(chunk),
+			}); err != nil {
+				log.Printf("Failed to send chunk: %v", err)
+			}
+			return nil
 		})
 
-		// 2. Execute tools and add tool result messages
-		for _, tc := range toolCalls {
-			log.Printf("Executing tool: %s args: %s", tc.Function.Name, tc.Function.Arguments)
-
-			// Notify frontend about tool execution
-			sendJSON(conn, WSMessage{
-				Type:    TypeMessage,
-				Content: fmt.Sprintf("\n\n> Calling tool: %s...\n", tc.Function.Name),
-			})
-
-			// Special handling for UI updates based on tool type
-			if tc.Function.Name == "TodoWrite" {
-				var todoArgs struct {
-					Items []TaskDTO `json:"items"`
-				}
-				if err := json.Unmarshal([]byte(tc.Function.Arguments), &todoArgs); err == nil {
-					sendJSON(conn, WSMessage{
-						Type:  TypeTaskUpdate,
-						Tasks: todoArgs.Items,
-					})
-				}
+		if err != nil {
+			log.Printf("StreamChat error: %v", err)
+			if err := sendJSON(conn, WSMessage{Type: TypeMessage, Content: fmt.Sprintf("\nError: %v", err)}); err != nil {
+				log.Printf("Failed to send stream error: %v", err)
 			}
-
-			if tc.Function.Name == "Task" {
-				var taskArgs struct {
-					Subagent string `json:"subagent_type"`
-					Desc     string `json:"description"`
-				}
-				if err := json.Unmarshal([]byte(tc.Function.Arguments), &taskArgs); err == nil {
-					sendJSON(conn, WSMessage{
-						Type:    TypeMessage,
-						Content: fmt.Sprintf("\n*Subagent [%s] started: %s*\n", taskArgs.Subagent, taskArgs.Desc),
-					})
-				}
-			}
-
-			if tc.Function.Name == "Skill" {
-				var skillArgs struct {
-					Name string `json:"name"`
-				}
-				if err := json.Unmarshal([]byte(tc.Function.Arguments), &skillArgs); err == nil {
-					sendJSON(conn, WSMessage{
-						Type:    TypeMessage,
-						Content: fmt.Sprintf("\n*Loaded Skill: %s*\n", skillArgs.Name),
-					})
-				}
-			}
-
-			result, err := toolService.ExecuteSkill(tc.Function.Name, tc.Function.Arguments)
-			if err != nil {
-				result = fmt.Sprintf("Error: %v", err)
-			}
-
-			messages = append(messages, ChatMessage{
-				Role:       "tool",
-				ToolCallID: tc.ID,
-				Name:       tc.Function.Name,
-				Content:    result,
-			})
+			break
 		}
 
-		// Continue loop to get next response from model
+		if len(resp.Choices) == 0 {
+			break
+		}
+
+		choice := resp.Choices[0]
+
+		// If there are tool calls
+		if len(choice.ToolCalls) > 0 {
+			// Save AI Message with Tool Calls
+			// We need to manually construct AIChatMessage with ToolCalls and save it
+			// Note: We might need to handle partial text content too if any
+			aiMsg := llms.AIChatMessage{
+				Content:   choice.Content,
+				ToolCalls: choice.ToolCalls,
+			}
+			// Use internal memory helper to save complex message (since SaveAIMessage only takes string)
+			// We need to expose a SaveMessage method or use memory package directly.
+			// Since llmService exposes GetHistory which returns memory.SQLiteHistory, let's use memory package directly here or add helper.
+			// Ideally llmService should have `SaveMessage`.
+			// Let's assume we can access `memory` package since we imported it (but we didn't import it in this file yet, let's check imports).
+			// We imported `fnchatbot/internal/services/memory`? No, we need to.
+			// Or we can add `SaveMessage` to `llm.Service`.
+			// I'll add `SaveMessage` to `llm.Service` via a separate edit or just rely on `SaveAIMessage` for text and fail for tools?
+			// No, tools are critical.
+
+			// Let's hack it: `llmService.SaveAIMessage` only saves text.
+			// I need to use `memory.NewSQLiteHistory(db.DB, ...).AddMessage(...)`.
+			hist := memory.NewSQLiteHistory(db.DB, uint(sessionID))
+			if err := hist.AddMessage(ctx, aiMsg); err != nil {
+				log.Printf("Failed to save tool-call message: %v", err)
+			}
+
+			// Execute Tools
+			for _, tc := range choice.ToolCalls {
+				if err := sendJSON(conn, WSMessage{
+					Type:    TypeMessage,
+					Content: fmt.Sprintf("\n\n> Calling tool: %s...\n", tc.FunctionCall.Name),
+				}); err != nil {
+					log.Printf("Failed to send tool notice: %v", err)
+				}
+
+				// Execute
+				result, err := toolService.ExecuteSkill(tc.FunctionCall.Name, tc.FunctionCall.Arguments)
+				if err != nil {
+					result = fmt.Sprintf("Error: %v", err)
+				}
+
+				// Handle specific tool UI updates (TodoWrite, etc) - Copied from old code
+				handleToolUIUpdates(conn, tc.FunctionCall.Name, tc.FunctionCall.Arguments)
+
+				// Save Tool Output
+				toolMsg := llms.ToolChatMessage{
+					ID:      tc.ID,
+					Content: result,
+				}
+				if err := hist.AddMessage(ctx, toolMsg); err != nil {
+					log.Printf("Failed to save tool result: %v", err)
+				}
+			}
+
+			// Continue loop to generate next response
+		} else {
+			// No tool calls, just text response
+			// Save it
+			if err := llmService.SaveAIMessage(ctx, uint(sessionID), choice.Content); err != nil {
+				log.Printf("Failed to save AI message: %v", err)
+			}
+			break
+		}
 	}
 
-	return fullResponse.String(), nil
-}
-
-func SendPermissionRequest(conn *websocket.Conn, requestID, command string, blockedPaths []string) error {
-	msg := WSMessage{
-		Type:         TypePermissionRequest,
-		RequestID:    requestID,
-		Command:      command,
-		BlockedPaths: blockedPaths,
-		Content:      "The command you are trying to execute requires access to restricted paths. Do you want to allow this operation?",
+	if err := sendJSON(conn, WSMessage{Type: TypeMessageEnd}); err != nil {
+		log.Printf("Failed to send message end: %v", err)
 	}
-	return conn.WriteJSON(msg)
 }
 
-func HandlePermissionResponse(conn *websocket.Conn, msg WSMessage) {
+func convertToLangChainTools(tools []services.Tool) []llms.Tool {
+	var lcTools []llms.Tool
+	for _, t := range tools {
+		lcTools = append(lcTools, llms.Tool{
+			Type: t.Type,
+			Function: &llms.FunctionDefinition{
+				Name:        t.Function.Name,
+				Description: t.Function.Description,
+				Parameters:  t.Function.Parameters,
+			},
+		})
+	}
+	return lcTools
+}
+
+func handleToolUIUpdates(conn *websocket.Conn, name, args string) {
+	if name == "TodoWrite" {
+		var todoArgs struct {
+			Items []TaskDTO `json:"items"`
+		}
+		if err := json.Unmarshal([]byte(args), &todoArgs); err == nil {
+			if err := sendJSON(conn, WSMessage{
+				Type:  TypeTaskUpdate,
+				Tasks: todoArgs.Items,
+			}); err != nil {
+				log.Printf("Failed to send task update: %v", err)
+			}
+		}
+	}
+	if name == "Task" {
+		var taskArgs struct {
+			Subagent string `json:"subagent_type"`
+			Desc     string `json:"description"`
+		}
+		if err := json.Unmarshal([]byte(args), &taskArgs); err == nil {
+			if err := sendJSON(conn, WSMessage{
+				Type:    TypeMessage,
+				Content: fmt.Sprintf("\n*Subagent [%s] started: %s*\n", taskArgs.Subagent, taskArgs.Desc),
+			}); err != nil {
+				log.Printf("Failed to send task start: %v", err)
+			}
+		}
+	}
+	if name == "Skill" {
+		var skillArgs struct {
+			Name string `json:"name"`
+		}
+		if err := json.Unmarshal([]byte(args), &skillArgs); err == nil {
+			if err := sendJSON(conn, WSMessage{
+				Type:    TypeMessage,
+				Content: fmt.Sprintf("\n*Loaded Skill: %s*\n", skillArgs.Name),
+			}); err != nil {
+				log.Printf("Failed to send skill message: %v", err)
+			}
+		}
+	}
+}
+
+func HandlePermissionResponse(msg WSMessage) {
 	if msg.RequestID == "" {
 		log.Printf("Permission response missing request_id")
 		return
@@ -545,30 +422,6 @@ func HandlePermissionResponse(conn *websocket.Conn, msg WSMessage) {
 		msg.RequestID, msg.Approved, msg.Remember)
 }
 
-func generateRequestID() string {
-	return "req_" + time.Now().Format("20060102150405") + "_" + randomString(8)
-}
-
-func randomString(n int) string {
-	const letters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = letters[time.Now().UnixNano()%int64(len(letters))]
-		time.Sleep(1 * time.Nanosecond)
-	}
-	return string(b)
-}
-
-func sendJSON(conn *websocket.Conn, v interface{}) {
-	conn.WriteJSON(v)
-}
-
-func saveMessage(conversationID uint, role string, content string) {
-	msg := models.Message{
-		ConversationID: conversationID,
-		Role:           models.MessageRole(role),
-		Content:        content,
-		Meta:           datatypes.JSON{},
-	}
-	db.DB.Create(&msg)
+func sendJSON(conn *websocket.Conn, v interface{}) error {
+	return conn.WriteJSON(v)
 }

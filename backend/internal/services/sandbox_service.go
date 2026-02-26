@@ -33,8 +33,8 @@ func NewSandboxService(db *gorm.DB) *SandboxService {
 }
 
 func (s *SandboxService) IsEnabled() bool {
-	var config SandboxConfig
-	if err := s.db.First(&config).Error; err != nil {
+	config, err := s.getConfig()
+	if err != nil {
 		return false
 	}
 	return config.Enabled
@@ -203,7 +203,14 @@ func (s *SandboxService) ExtractPathsFromCommand(command string) []string {
 }
 
 func (s *SandboxService) isFlag(str string) bool {
-	return strings.HasPrefix(str, "-") || strings.HasPrefix(str, "/")
+	if strings.HasPrefix(str, "-") {
+		return true
+	}
+	if strings.HasPrefix(str, "/") {
+		rest := strings.TrimPrefix(str, "/")
+		return rest == "?" || strings.EqualFold(rest, "help")
+	}
+	return false
 }
 
 func (s *SandboxService) uniquePaths(paths []string) []string {
@@ -246,13 +253,26 @@ func (s *SandboxService) CheckCommandPermission(command string) (allowed bool, b
 }
 
 func (s *SandboxService) SetEnabled(enabled bool) error {
-	var config SandboxConfig
-	result := s.db.First(&config)
-	if result.Error == gorm.ErrRecordNotFound {
-		config = SandboxConfig{Enabled: enabled}
-		return s.db.Create(&config).Error
+	config, err := s.getConfig()
+	if err != nil {
+		return err
 	}
-	return s.db.Model(&config).Update("enabled", enabled).Error
+	config.Enabled = enabled
+	return s.db.Save(&config).Error
+}
+
+func (s *SandboxService) getConfig() (SandboxConfig, error) {
+	var config SandboxConfig
+	if err := s.db.First(&config).Error; err != nil {
+		if err != gorm.ErrRecordNotFound {
+			return SandboxConfig{}, err
+		}
+		config = SandboxConfig{Enabled: false}
+		if err := s.db.Create(&config).Error; err != nil {
+			return SandboxConfig{}, err
+		}
+	}
+	return config, nil
 }
 
 func (s *SandboxService) GetAllPaths() []models.SandboxPathInfo {

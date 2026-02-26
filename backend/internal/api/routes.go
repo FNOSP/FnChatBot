@@ -28,10 +28,10 @@ func RegisterRoutes(r *gin.RouterGroup) {
 	r.POST("/models/available", GetAvailableModels) // 废弃：使用 POST /providers/:id/fetch-models
 
 	// 对话
-	r.GET("/conversations", GetConversations)
-	r.POST("/conversations", CreateConversation)
-	r.GET("/conversations/:id/messages", GetConversationMessages)
-	r.DELETE("/conversations/:id", DeleteConversation)
+	r.GET("/conversations", GetSessions)
+	r.POST("/conversations", CreateSession)
+	r.GET("/conversations/:id/messages", GetSessionMessages)
+	r.DELETE("/conversations/:id", DeleteSession)
 
 	// Skills
 	r.GET("/skills", GetSkills)

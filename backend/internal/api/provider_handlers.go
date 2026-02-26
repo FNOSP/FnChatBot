@@ -1,14 +1,10 @@
 package api
 
 import (
-	"context"
 	"net/http"
-	"strconv"
-	"time"
 
 	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
-	"fnchatbot/internal/services/adapters"
 
 	"github.com/gin-gonic/gin"
 )
@@ -182,10 +178,10 @@ func FetchModels(c *gin.Context) {
 	var req FetchModelsRequest
 	_ = c.ShouldBindJSON(&req)
 
-	baseURL := provider.BaseURL
+	// baseURL := provider.BaseURL
 	apiKey := provider.APIKey
 	if req.BaseURL != "" {
-		baseURL = req.BaseURL
+		// baseURL = req.BaseURL
 	}
 	if req.APIKey != "" {
 		apiKey = req.APIKey
@@ -197,39 +193,29 @@ func FetchModels(c *gin.Context) {
 		return
 	}
 
-	adapter := adapters.GetAdapter(provider.Type)
-	if adapter == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No adapter available for provider type: " + string(provider.Type)})
-		return
-	}
+	// adapter := adapters.GetAdapter(provider.Type)
+	// if adapter == nil {
+	// 	c.JSON(http.StatusBadRequest, gin.H{"error": "No adapter available for provider type: " + string(provider.Type)})
+	// 	return
+	// }
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
+	// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	// defer cancel()
 
-	modelsInfo, err := adapter.FetchModels(ctx, baseURL, apiKey)
-	if err != nil {
-		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
-		return
-	}
+	// modelsInfo, err := adapter.FetchModels(ctx, baseURL, apiKey)
+	// if err != nil {
+	// 	c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
+	// 	return
+	// }
 
-	result := make([]ModelDetail, 0, len(modelsInfo))
-	for _, m := range modelsInfo {
-		result = append(result, ModelDetail{
-			ID:      m.ID,
-			Name:    m.Name,
-			OwnedBy: m.OwnedBy,
-		})
-	}
+	// result := make([]ModelDetail, 0, len(modelsInfo))
+	// for _, m := range modelsInfo {
+	// 	result = append(result, ModelDetail{
+	// 		ID:      m.ID,
+	// 		Name:    m.Name,
+	// 		OwnedBy: m.OwnedBy,
+	// 	})
+	// }
 
-	c.JSON(http.StatusOK, FetchModelsResponse{Models: result})
-}
-
-func parseIntParam(c *gin.Context, param string) (uint, bool) {
-	idStr := c.Param(param)
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid " + param})
-		return 0, false
-	}
-	return uint(id), true
+	c.JSON(http.StatusOK, FetchModelsResponse{Models: []ModelDetail{}}) // result})
 }

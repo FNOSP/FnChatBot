@@ -64,75 +64,6 @@ func CreateModel(c *gin.Context) {
 	c.JSON(http.StatusOK, config)
 }
 
-type UpdateModelConfigRequest struct {
-	Name        string   `json:"name"`
-	Provider    *string  `json:"provider"`
-	ProviderID  *uint    `json:"provider_id"`
-	Model       string   `json:"model"`
-	Temperature *float32 `json:"temperature"`
-	MaxTokens   *int     `json:"max_tokens"`
-	IsDefault   *bool    `json:"is_default"`
-}
-
-func UpdateModel(c *gin.Context) {
-	id := c.Param("id")
-	var config models.ModelConfig
-	if err := db.DB.First(&config, id).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Model not found"})
-		return
-	}
-	var req UpdateModelConfigRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if req.Name != "" {
-		config.Name = req.Name
-	}
-	if req.Model != "" {
-		config.Model = req.Model
-	}
-	if req.Provider != nil {
-		config.Provider = *req.Provider
-	}
-	if req.ProviderID != nil && *req.ProviderID > 0 {
-		config.ProviderID = *req.ProviderID
-	}
-	if req.ProviderID == nil && req.Provider != nil {
-		resolvedID, err := resolveProviderID(0, *req.Provider)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-			return
-		}
-		config.ProviderID = resolvedID
-	}
-	if req.Temperature != nil {
-		config.Temperature = *req.Temperature
-	}
-	if req.MaxTokens != nil {
-		config.MaxTokens = *req.MaxTokens
-	}
-	if req.IsDefault != nil {
-		config.IsDefault = *req.IsDefault
-	}
-
-	if err := db.DB.Save(&config).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, config)
-}
-
-func DeleteModel(c *gin.Context) {
-	id := c.Param("id")
-	if err := db.DB.Delete(&models.ModelConfig{}, id).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "Model deleted"})
-}
-
 func resolveProviderID(providerID uint, providerKey string) (uint, error) {
 	if providerID > 0 {
 		return providerID, nil
@@ -147,18 +78,18 @@ func resolveProviderID(providerID uint, providerKey string) (uint, error) {
 	return provider.ID, nil
 }
 
-// --- Conversation Handlers ---
+// --- Session Handlers ---
 
-func GetConversations(c *gin.Context) {
-	var conversations []models.Conversation
-	if err := db.DB.Order("created_at desc").Find(&conversations).Error; err != nil {
+func GetSessions(c *gin.Context) {
+	var sessions []models.Session
+	if err := db.DB.Order("created_at desc").Find(&sessions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, conversations)
+	c.JSON(http.StatusOK, sessions)
 }
 
-func CreateConversation(c *gin.Context) {
+func CreateSession(c *gin.Context) {
 	var input struct {
 		Title   string `json:"title"`
 		ModelID uint   `json:"model_id"`
@@ -168,34 +99,34 @@ func CreateConversation(c *gin.Context) {
 		return
 	}
 
-	conv := models.Conversation{
+	session := models.Session{
 		Title:   input.Title,
 		ModelID: input.ModelID,
 	}
-	if err := db.DB.Create(&conv).Error; err != nil {
+	if err := db.DB.Create(&session).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, conv)
+	c.JSON(http.StatusOK, session)
 }
 
-func GetConversationMessages(c *gin.Context) {
+func GetSessionMessages(c *gin.Context) {
 	id := c.Param("id")
 	var messages []models.Message
-	if err := db.DB.Where("conversation_id = ?", id).Order("created_at asc").Find(&messages).Error; err != nil {
+	if err := db.DB.Where("session_id = ?", id).Preload("Parts").Order("created_at asc").Find(&messages).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, messages)
 }
 
-func DeleteConversation(c *gin.Context) {
+func DeleteSession(c *gin.Context) {
 	id := c.Param("id")
-	if err := db.DB.Delete(&models.Conversation{}, id).Error; err != nil {
+	if err := db.DB.Delete(&models.Session{}, id).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "Conversation deleted"})
+	c.JSON(http.StatusOK, gin.H{"message": "Session deleted"})
 }
 
 type AvailableModelsRequest struct {
@@ -252,7 +183,9 @@ func GetAvailableModels(c *gin.Context) {
 		c.JSON(http.StatusBadGateway, gin.H{"error": fmt.Sprintf("failed to connect to API: %v", err)})
 		return
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -276,13 +209,13 @@ func GetAvailableModels(c *gin.Context) {
 		return
 	}
 
-	models := make([]ModelInfo, 0, len(openAIResp.Data))
+	modelList := make([]ModelInfo, 0, len(openAIResp.Data))
 	for _, m := range openAIResp.Data {
-		models = append(models, ModelInfo{
+		modelList = append(modelList, ModelInfo{
 			ID:   m.ID,
 			Name: m.ID,
 		})
 	}
 
-	c.JSON(http.StatusOK, AvailableModelsResponse{Models: models})
+	c.JSON(http.StatusOK, AvailableModelsResponse{Models: modelList})
 }

@@ -1,9 +1,11 @@
 package services
 
 import (
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/glebarez/sqlite"
@@ -11,10 +13,18 @@ import (
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	name := strings.NewReplacer("/", "_", " ", "_").Replace(t.Name())
+	dsn := fmt.Sprintf("file:%s?mode=memory&cache=shared", name)
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatalf("failed to connect to database: %v", err)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatalf("failed to get sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
 	return db
 }
 

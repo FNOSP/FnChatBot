@@ -21,8 +21,8 @@ type ModelConfig struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// Conversation represents a chat session
-type Conversation struct {
+// Session represents a chat session
+type Session struct {
 	ID        uint        `gorm:"primaryKey" json:"id"`
 	Title     string      `gorm:"type:varchar(200);not null" json:"title"`
 	ModelID   uint        `json:"model_id"`
@@ -40,30 +40,39 @@ const (
 	RoleSystem    MessageRole = "system"
 )
 
-// Message represents a single message in a conversation
+// Message represents a single message in a session
 type Message struct {
-	ID             uint           `gorm:"primaryKey" json:"id"`
-	ConversationID uint           `gorm:"index;not null" json:"conversation_id"`
-	Role           MessageRole    `gorm:"type:varchar(20);not null" json:"role"`
-	Content        string         `gorm:"type:text;not null" json:"content"`
-	Meta           datatypes.JSON `json:"meta"` // Stores thinking process, task updates, etc.
-	CreatedAt      time.Time      `gorm:"index" json:"created_at"`
+	ID        uint        `gorm:"primaryKey" json:"id"`
+	SessionID uint        `gorm:"index;not null" json:"session_id"`
+	Role      MessageRole `gorm:"type:varchar(20);not null" json:"role"`
+	Parts     []Part      `gorm:"foreignKey:MessageID" json:"parts"`
+	CreatedAt time.Time   `gorm:"index" json:"created_at"`
+}
+
+// Part represents a part of a message content
+type Part struct {
+	ID        uint           `gorm:"primaryKey" json:"id"`
+	MessageID uint           `gorm:"index;not null" json:"message_id"`
+	Type      string         `gorm:"type:varchar(50);not null" json:"type"` // e.g., text, image, tool_use, tool_result
+	Content   string         `gorm:"type:text;not null" json:"content"`
+	Meta      datatypes.JSON `json:"meta"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 // MCPConfig and Skill moved to separate files
 
 // AgentTask represents a task executed by the agent
 type AgentTask struct {
-	ID             uint           `gorm:"primaryKey" json:"id"`
-	ConversationID uint           `gorm:"index;not null" json:"conversation_id"`
-	SkillName      string         `gorm:"type:varchar(100);not null" json:"skill_name"`
-	Status         string         `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"` // pending, running, completed, failed
-	Parameters     datatypes.JSON `json:"parameters"`
-	Result         datatypes.JSON `json:"result"`
-	ErrorMessage   string         `gorm:"type:text" json:"error_message"`
-	CreatedAt      time.Time      `json:"created_at"`
-	StartedAt      *time.Time     `json:"started_at"`
-	CompletedAt    *time.Time     `json:"completed_at"`
+	ID           uint           `gorm:"primaryKey" json:"id"`
+	SessionID    uint           `gorm:"index;not null" json:"session_id"`
+	SkillName    string         `gorm:"type:varchar(100);not null" json:"skill_name"`
+	Status       string         `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"` // pending, running, completed, failed
+	Parameters   datatypes.JSON `json:"parameters"`
+	Result       datatypes.JSON `json:"result"`
+	ErrorMessage string         `gorm:"type:text" json:"error_message"`
+	CreatedAt    time.Time      `json:"created_at"`
+	StartedAt    *time.Time     `json:"started_at"`
+	CompletedAt  *time.Time     `json:"completed_at"`
 }
 
 type SandboxPathInfo struct {

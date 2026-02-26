@@ -17,6 +17,17 @@ const (
 	ToolTypeFunction = "function"
 )
 
+type Tool struct {
+	Type     string     `json:"type"`
+	Function ToolSchema `json:"function"`
+}
+
+type ToolSchema struct {
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Parameters  map[string]interface{} `json:"parameters"`
+}
+
 type ToolService struct{}
 
 func NewToolService() *ToolService {
@@ -217,7 +228,9 @@ Skill loaded successfully. You can now use this knowledge to assist the user.`, 
 	}
 
 	var mcps []models.MCPConfig
-	db.DB.Where("enabled = ?", true).Find(&mcps)
+	if err := db.DB.Where("enabled = ?", true).Find(&mcps).Error; err != nil {
+		return "", fmt.Errorf("failed to load MCP configs: %v", err)
+	}
 
 	for _, mcp := range mcps {
 		result, err := s.executeMCPTool(mcp, name, args)
@@ -234,7 +247,10 @@ func (s *ToolService) executeMCPTool(mcp models.MCPConfig, name string, args str
 		"name": name,
 		"args": args,
 	}
-	jsonBody, _ := json.Marshal(payload)
+	jsonBody, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("failed to build MCP payload: %v", err)
+	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Post(fmt.Sprintf("%s/tools/execute", mcp.BaseURL), "application/json", bytes.NewBuffer(jsonBody))

@@ -34,8 +34,9 @@ func InitDB(dbPath string) {
 		&models.Provider{},
 		&models.Model{},
 		&models.ModelConfig{},
-		&models.Conversation{},
+		&models.Session{},
 		&models.Message{},
+		&models.Part{},
 		&models.MCPConfig{},
 		&models.Skill{},
 		&models.AgentTask{},
@@ -166,10 +167,10 @@ func seedSandboxConfig() {
 	var count int64
 	DB.Model(&models.SandboxConfig{}).Count(&count)
 	if count == 0 {
-		config := models.SandboxConfig{
+		sandboxConfig := models.SandboxConfig{
 			Enabled: true,
 		}
-		if err := DB.Create(&config).Error; err != nil {
+		if err := DB.Create(&sandboxConfig).Error; err != nil {
 			log.Printf("Failed to seed sandbox config: %v", err)
 		} else {
 			log.Println("Seeded initial sandbox config")
