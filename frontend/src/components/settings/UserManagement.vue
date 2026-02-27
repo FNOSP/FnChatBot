@@ -48,6 +48,7 @@ const passwordNew = ref('')
 const passwordConfirm = ref('')
 const passwordOld = ref('')
 
+// Load all users for admin management table
 const fetchUsers = async () => {
   loading.value = true
   try {
@@ -61,6 +62,7 @@ const fetchUsers = async () => {
   }
 }
 
+// Open edit modal and populate editable fields
 const openEdit = (user: UserRow) => {
   editingUser.value = { ...user }
   editUsername.value = user.username
@@ -69,6 +71,7 @@ const openEdit = (user: UserRow) => {
   showEditModal.value = true
 }
 
+// Persist edited user fields to backend
 const saveEdit = async () => {
   if (!editingUser.value) return
   try {
@@ -92,6 +95,7 @@ const saveEdit = async () => {
   }
 }
 
+// Open add-user modal and reset form state
 const openAdd = () => {
   newUsername.value = ''
   newDescription.value = ''
@@ -101,6 +105,7 @@ const openAdd = () => {
   showAddModal.value = true
 }
 
+// Create new user after validating form input
 const createUser = async () => {
   const username = newUsername.value.trim()
   const password = newPassword.value
@@ -130,6 +135,7 @@ const createUser = async () => {
   }
 }
 
+// Open change-password modal for selected user
 const openChangePassword = (user: UserRow) => {
   passwordUser.value = user
   passwordNew.value = ''
@@ -138,6 +144,7 @@ const openChangePassword = (user: UserRow) => {
   showPasswordModal.value = true
 }
 
+// Change user password with basic client-side validation
 const changePassword = async () => {
   if (!passwordUser.value) return
   if (!passwordNew.value || !passwordConfirm.value) {
@@ -249,16 +256,15 @@ onMounted(() => {
       :okText="'Save'"
       @ok="saveEdit"
       @cancel="showEditModal = false"
-      @close="showEditModal = false"
     >
       <div class="space-y-3">
         <div v-if="auth.isAdmin">
           <label class="block text-sm font-medium mb-1">Username</label>
-          <Input v-model="editUsername" />
+          <Input :value="editUsername" @change="val => (editUsername = val)" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Description</label>
-          <Input v-model="editDescription" />
+          <Input :value="editDescription" @change="val => (editDescription = val)" />
         </div>
         <div v-if="auth.isAdmin">
           <label class="block text-sm font-medium mb-1">Enabled</label>
@@ -274,7 +280,6 @@ onMounted(() => {
       :okText="'Create'"
       @ok="createUser"
       @cancel="showAddModal = false"
-      @close="showAddModal = false"
     >
       <div class="space-y-3">
         <div>
@@ -286,19 +291,23 @@ onMounted(() => {
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Username</label>
-          <Input v-model="newUsername" />
+          <Input :value="newUsername" @change="val => (newUsername = val)" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Password</label>
-          <Input v-model="newPassword" type="password" />
+          <Input :value="newPassword" type="password" @change="val => (newPassword = val)" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Confirm Password</label>
-          <Input v-model="newPasswordConfirm" type="password" />
+          <Input
+            :value="newPasswordConfirm"
+            type="password"
+            @change="val => (newPasswordConfirm = val)"
+          />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Description</label>
-          <Input v-model="newDescription" />
+          <Input :value="newDescription" @change="val => (newDescription = val)" />
         </div>
       </div>
     </Modal>
@@ -310,20 +319,23 @@ onMounted(() => {
       :okText="'Update'"
       @ok="changePassword"
       @cancel="showPasswordModal = false"
-      @close="showPasswordModal = false"
     >
       <div class="space-y-3">
         <div>
           <label class="block text-sm font-medium mb-1">Old Password (for self)</label>
-          <Input v-model="passwordOld" type="password" />
+          <Input :value="passwordOld" type="password" @change="val => (passwordOld = val)" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">New Password</label>
-          <Input v-model="passwordNew" type="password" />
+          <Input :value="passwordNew" type="password" @change="val => (passwordNew = val)" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Confirm New Password</label>
-          <Input v-model="passwordConfirm" type="password" />
+          <Input
+            :value="passwordConfirm"
+            type="password"
+            @change="val => (passwordConfirm = val)"
+          />
         </div>
       </div>
     </Modal>

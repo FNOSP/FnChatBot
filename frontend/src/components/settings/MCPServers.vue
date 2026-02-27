@@ -49,6 +49,7 @@ const form = ref<MCPConfig>({
 const saving = ref(false)
 
 // --- Actions ---
+// Load all configured MCP servers from backend
 const fetchServers = async () => {
   loading.value = true
   try {
@@ -61,18 +62,21 @@ const fetchServers = async () => {
   }
 }
 
+// Open dialog for creating a new MCP server
 const openAddDialog = () => {
   editingServer.value = null
   form.value = { name: '', base_url: '', api_key: '', enabled: true }
   showDialog.value = true
 }
 
+// Open dialog for editing an existing MCP server
 const openEditDialog = (server: MCPConfig) => {
   editingServer.value = server
   form.value = { ...server }
   showDialog.value = true
 }
 
+// Delete a single MCP server by id
 const deleteServer = async (id: number) => {
   if (!confirm(t('common.deleteConfirm'))) return
   try {
@@ -83,6 +87,7 @@ const deleteServer = async (id: number) => {
   }
 }
 
+// Persist MCP server changes (create or update)
 const saveServer = async () => {
   saving.value = true
   try {
@@ -100,6 +105,7 @@ const saveServer = async () => {
   }
 }
 
+// Toggle MCP server enabled flag with optimistic UI update
 const toggleServer = async (server: MCPConfig) => {
     if (!server.id) return
     // Optimistic update
@@ -203,11 +209,12 @@ onMounted(() => {
 
     <!-- Dialog -->
     <Modal
-        v-model:visible="showDialog"
+        :visible="showDialog"
         :title="editingServer ? t('mcp.editServer') : t('mcp.addServer')"
         :okText="t('common.save')"
         :cancelText="t('common.cancel')"
         @ok="saveServer"
+        @cancel="showDialog = false"
         :confirmLoading="saving"
         :okButtonProps="{ disabled: !form.name || !form.base_url }"
     >
@@ -215,7 +222,8 @@ onMounted(() => {
             <div class="grid gap-2">
                 <label class="text-sm font-medium">{{ t('mcp.name') }}</label>
                 <Input 
-                    v-model="form.name" 
+                    :value="form.name"
+                    @change="val => (form.name = val)"
                     :placeholder="t('mcp.namePlaceholder')"
                     autofocus
                 />
@@ -223,14 +231,16 @@ onMounted(() => {
             <div class="grid gap-2">
                 <label class="text-sm font-medium">{{ t('mcp.baseUrl') }}</label>
                 <Input 
-                    v-model="form.base_url" 
+                    :value="form.base_url"
+                    @change="val => (form.base_url = val)"
                     :placeholder="t('mcp.urlPlaceholder')"
                 />
             </div>
             <div class="grid gap-2">
                 <label class="text-sm font-medium">{{ t('mcp.apiKey') }}</label>
                 <Input 
-                    v-model="form.api_key" 
+                    :value="form.api_key"
+                    @change="val => (form.api_key = val)"
                     mode="password"
                     :placeholder="t('mcp.apiKeyPlaceholder')"
                 />

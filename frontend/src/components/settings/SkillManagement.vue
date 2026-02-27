@@ -43,6 +43,7 @@ const uploading = ref(false)
 const uploadError = ref('')
 
 // --- Actions ---
+// Load all installed skills from backend
 const fetchSkills = async () => {
   loading.value = true
   try {
@@ -55,6 +56,7 @@ const fetchSkills = async () => {
   }
 }
 
+// Toggle single skill enabled flag with optimistic UI update
 const toggleSkill = async (skill: Skill) => {
   // Optimistic update
   const newValue = !skill.enabled
@@ -69,6 +71,7 @@ const toggleSkill = async (skill: Skill) => {
   }
 }
 
+// Delete a single skill by id
 const deleteSkill = async (id: number) => {
   if (!confirm(t('common.deleteConfirm'))) return
   try {
@@ -79,6 +82,7 @@ const deleteSkill = async (id: number) => {
   }
 }
 
+// Capture selected file and prevent auto upload
 const beforeUpload = (file: any) => {
     // Semi UI Upload component passes a File object
     // We want to prevent default upload and handle it manually
@@ -87,6 +91,7 @@ const beforeUpload = (file: any) => {
     return false // Return false to prevent auto upload
 }
 
+// Upload selected skill file to backend
 const uploadSkill = async () => {
   if (!uploadFile.value) return
   
@@ -113,6 +118,7 @@ const uploadSkill = async () => {
   }
 }
 
+// Clear selected skill file and related error
 const handleRemoveFile = () => {
     uploadFile.value = null
     uploadError.value = ''
@@ -198,11 +204,12 @@ onMounted(() => {
 
     <!-- Upload Dialog -->
     <Modal
-        v-model:visible="showUploadDialog"
+        :visible="showUploadDialog"
         :title="t('skills.uploadTitle')"
         :okText="t('skills.uploadSkill')"
         :cancelText="t('common.cancel')"
         @ok="uploadSkill"
+        @cancel="showUploadDialog = false"
         :confirmLoading="uploading"
         :okButtonProps="{ disabled: !uploadFile }"
     >

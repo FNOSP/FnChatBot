@@ -608,7 +608,7 @@ watch(selectedProviderId, () => {
       </LayoutContent>
 
       <Modal
-        v-model:visible="modelListVisible"
+        :visible="modelListVisible"
         :title="t('settings.modelList.modalTitle')"
         :footer="null"
         width="600px"
