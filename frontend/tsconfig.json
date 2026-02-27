@@ -12,7 +12,9 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "types": ["node", "vite/client"],
+    "verbatimModuleSyntax": false
   },
   "include": [
     "src/**/*.ts",

@@ -28,10 +28,13 @@ type ToolSchema struct {
 	Parameters  map[string]interface{} `json:"parameters"`
 }
 
-type ToolService struct{}
+type ToolService struct {
+	UserID uint
+}
 
-func NewToolService() *ToolService {
-	return &ToolService{}
+// NewToolService creates a ToolService scoped to a specific user.
+func NewToolService(userID uint) *ToolService {
+	return &ToolService{UserID: userID}
 }
 
 func (s *ToolService) GetAvailableTools() ([]Tool, error) {
@@ -96,7 +99,7 @@ func (s *ToolService) GetAvailableTools() ([]Tool, error) {
 	})
 
 	var skills []models.Skill
-	if err := db.DB.Where("enabled = ?", true).Find(&skills).Error; err != nil {
+	if err := db.DB.Where("enabled = ? AND user_id = ?", true, s.UserID).Find(&skills).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch skills: %v", err)
 	}
 
@@ -110,7 +113,7 @@ func (s *ToolService) GetAvailableTools() ([]Tool, error) {
 	}
 
 	var mcps []models.MCPConfig
-	if err := db.DB.Where("enabled = ?", true).Find(&mcps).Error; err != nil {
+	if err := db.DB.Where("enabled = ? AND user_id = ?", true, s.UserID).Find(&mcps).Error; err != nil {
 		return nil, fmt.Errorf("failed to fetch MCPs: %v", err)
 	}
 
@@ -164,7 +167,12 @@ func (s *ToolService) fetchMCPTools(mcp models.MCPConfig) ([]Tool, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	// Close response body to avoid resource leaks.
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Failed to close MCP tools response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("MCP returned status %d", resp.StatusCode)
@@ -257,7 +265,12 @@ func (s *ToolService) executeMCPTool(mcp models.MCPConfig, name string, args str
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	// Close response body to avoid resource leaks.
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			log.Printf("Failed to close MCP execute response body: %v", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("MCP execution failed with status %d", resp.StatusCode)

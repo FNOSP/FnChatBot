@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
-import axios from 'axios'
+import { http } from '../../services/http'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '../../composables/useTheme'
 import { predefinedProviders } from '../../data/providers'
@@ -65,8 +65,6 @@ interface Provider {
   is_system?: boolean
   models?: Model[]
 }
-
-const API_BASE = 'http://localhost:8080/api'
 
 const loading = ref(false)
 const saving = ref(false)
@@ -146,7 +144,7 @@ const columns = computed((): ColumnProps<Model>[] => [
 const fetchProviders = async () => {
   loading.value = true
   try {
-    const res = await axios.get(`${API_BASE}/providers`)
+    const res = await http.get('/providers')
     const backendProviders = normalizeProvidersResponse(res.data)
     // #endregion
     
@@ -202,7 +200,7 @@ const toggleProvider = async (provider: Provider) => {
   provider.enabled = !provider.enabled
   
   try {
-    await axios.patch(`${API_BASE}/providers/${provider.id}/toggle`)
+    await http.patch(`/providers/${provider.id}/toggle`)
     Toast.success(provider.enabled ? t('common.enabled') : t('common.disabled'))
   } catch (e) {
     provider.enabled = previousState
@@ -229,9 +227,9 @@ const saveProvider = async () => {
     }
     
     if (p.id) {
-      await axios.put(`${API_BASE}/providers/${p.id}`, payload)
+      await http.put(`/providers/${p.id}`, payload)
     } else {
-      const res = await axios.post(`${API_BASE}/providers`, payload)
+      const res = await http.post('/providers', payload)
       p.id = res.data.id
     }
     
@@ -261,7 +259,7 @@ const fetchRemoteModels = async () => {
   
   modelListLoading.value = true
   try {
-    const res = await axios.post(`${API_BASE}/providers/${p.id}/fetch-models`, {
+    const res = await http.post(`/providers/${p.id}/fetch-models`, {
       base_url: p.base_url,
       api_key: p.api_key
     })
@@ -290,7 +288,7 @@ const addRemoteModel = async (model: { id: string; name: string; owned_by?: stri
 
   saving.value = true
   try {
-    const res = await axios.post(`${API_BASE}/providers/${selectedProvider.value.id}/models`, {
+    const res = await http.post(`/providers/${selectedProvider.value.id}/models`, {
       model_id: model.id,
       name: model.name || model.id,
       owned_by: model.owned_by || '',
@@ -316,7 +314,7 @@ const removeRemoteModel = async (modelId: string) => {
 
   saving.value = true
   try {
-    await axios.delete(`${API_BASE}/models/${target.id}`)
+    await http.delete(`/models/${target.id}`)
     selectedProvider.value.models = selectedProvider.value.models?.filter(m => m.id !== target.id) || []
     Toast.success(t('common.success'))
   } catch (e) {
@@ -344,7 +342,7 @@ const removeModel = async (model: Model) => {
   
   if (model.id) {
     try {
-      await axios.delete(`${API_BASE}/models/${model.id}`)
+      await http.delete(`/models/${model.id}`)
       selectedProvider.value.models = selectedProvider.value.models?.filter(m => m.id !== model.id) || []
       Toast.success(t('common.success'))
     } catch (e) {
@@ -361,13 +359,13 @@ const saveModel = async (model: Model) => {
   
   try {
     if (model.id) {
-      await axios.put(`${API_BASE}/models/${model.id}`, model)
+      await http.put(`/models/${model.id}`, model)
     } else {
       const payload = {
         ...model,
         provider_id: selectedProvider.value.id
       }
-      const res = await axios.post(`${API_BASE}/providers/${selectedProvider.value.id}/models`, payload)
+      const res = await http.post(`/providers/${selectedProvider.value.id}/models`, payload)
       model.id = res.data.id
     }
     Toast.success(t('common.success'))

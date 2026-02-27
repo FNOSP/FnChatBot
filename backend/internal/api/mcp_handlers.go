@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"fnchatbot/internal/auth"
 	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
 
@@ -11,8 +12,14 @@ import (
 
 // GetMCPs returns all MCP configurations
 func GetMCPs(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	var mcps []models.MCPConfig
-	if err := db.DB.Find(&mcps).Error; err != nil {
+	if err := db.DB.Where("user_id = ?", user.ID).Find(&mcps).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -21,9 +28,15 @@ func GetMCPs(c *gin.Context) {
 
 // GetMCP returns a single MCP configuration
 func GetMCP(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	id := c.Param("id")
 	var mcp models.MCPConfig
-	if err := db.DB.First(&mcp, id).Error; err != nil {
+	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).First(&mcp).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "MCP config not found"})
 		return
 	}
@@ -32,11 +45,19 @@ func GetMCP(c *gin.Context) {
 
 // CreateMCP creates a new MCP configuration
 func CreateMCP(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	var mcp models.MCPConfig
 	if err := c.ShouldBindJSON(&mcp); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	mcp.UserID = user.ID
+
 	if err := db.DB.Create(&mcp).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -46,9 +67,15 @@ func CreateMCP(c *gin.Context) {
 
 // UpdateMCP updates an existing MCP configuration
 func UpdateMCP(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	id := c.Param("id")
 	var mcp models.MCPConfig
-	if err := db.DB.First(&mcp, id).Error; err != nil {
+	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).First(&mcp).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "MCP config not found"})
 		return
 	}
@@ -74,8 +101,14 @@ func UpdateMCP(c *gin.Context) {
 
 // DeleteMCP deletes an MCP configuration
 func DeleteMCP(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	id := c.Param("id")
-	if err := db.DB.Delete(&models.MCPConfig{}, id).Error; err != nil {
+	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).Delete(&models.MCPConfig{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

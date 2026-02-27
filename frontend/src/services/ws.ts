@@ -1,3 +1,5 @@
+import { useAuthStore } from '../store/auth'
+
 type MessageHandler = (data: any) => void
 
 export class WebSocketService {
@@ -14,7 +16,14 @@ export class WebSocketService {
       this.ws.close()
     }
 
-    const wsUrl = `${this.url}/ws/chat/${conversationId}`
+    let wsUrl = `${this.url}/ws/chat/${conversationId}`
+    // Attach JWT token as query parameter when available.
+    const auth = useAuthStore()
+    if (auth?.token) {
+      const sep = wsUrl.includes('?') ? '&' : '?'
+      wsUrl = `${wsUrl}${sep}token=${encodeURIComponent(auth.token)}`
+    }
+
     console.log('Connecting to WebSocket:', wsUrl)
     this.ws = new WebSocket(wsUrl)
 

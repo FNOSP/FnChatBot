@@ -7,6 +7,7 @@ import SandboxSettings from '../components/settings/SandboxSettings.vue'
 import ModelServices from '../components/settings/ModelServices.vue'
 import MCPServers from '../components/settings/MCPServers.vue'
 import SkillManagement from '../components/settings/SkillManagement.vue'
+import UserManagement from '../components/settings/UserManagement.vue'
 import { Sun, Moon } from 'lucide-vue-next'
 import { 
   Layout as SemiLayout, 
@@ -47,7 +48,8 @@ const menuItems = computed(() => [
   { itemKey: 'sandbox', text: t('settings.sandbox'), icon: IconShield, component: SandboxSettings },
   { itemKey: 'models', text: t('settings.modelServices'), icon: IconServer, component: ModelServices },
   { itemKey: 'mcp', text: t('settings.mcpServers'), icon: IconCloud, component: MCPServers },
-  { itemKey: 'skills', text: t('settings.skillManagement'), icon: IconCode, component: SkillManagement }
+  { itemKey: 'skills', text: t('settings.skillManagement'), icon: IconCode, component: SkillManagement },
+  { itemKey: 'users', text: t('settings.userManagement'), icon: IconCode, component: UserManagement }
 ])
 
 const currentComponent = computed(() => {

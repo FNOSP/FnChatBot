@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { http } from '../../services/http'
 import { useI18n } from 'vue-i18n'
 import { 
   List, 
@@ -46,7 +46,7 @@ const uploadError = ref('')
 const fetchSkills = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8080/api/skills')
+    const res = await http.get('/skills')
     skills.value = res.data
   } catch (e) {
     console.error('Failed to fetch skills', e)
@@ -61,7 +61,7 @@ const toggleSkill = async (skill: Skill) => {
   skill.enabled = newValue
   
   try {
-    await axios.patch(`http://localhost:8080/api/skills/${skill.id}`, { enabled: newValue })
+    await http.patch(`/skills/${skill.id}`, { enabled: newValue })
   } catch (e) {
     // Revert
     skill.enabled = !newValue
@@ -72,7 +72,7 @@ const toggleSkill = async (skill: Skill) => {
 const deleteSkill = async (id: number) => {
   if (!confirm(t('common.deleteConfirm'))) return
   try {
-    await axios.delete(`http://localhost:8080/api/skills/${id}`)
+    await http.delete(`/skills/${id}`)
     await fetchSkills()
   } catch (e) {
     console.error('Failed to delete skill', e)
@@ -97,7 +97,7 @@ const uploadSkill = async () => {
   formData.append('file', uploadFile.value)
   
   try {
-    await axios.post('http://localhost:8080/api/skills/upload', formData, {
+    await http.post('/skills/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }

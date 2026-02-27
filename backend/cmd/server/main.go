@@ -7,6 +7,8 @@ import (
 
 	"fnchatbot/internal/api"
 	"fnchatbot/internal/api/ws"
+	"fnchatbot/internal/auth"
+	"fnchatbot/internal/config"
 	"fnchatbot/internal/db"
 
 	"github.com/gin-contrib/cors"
@@ -14,8 +16,16 @@ import (
 )
 
 func main() {
+	// Load application configuration.
+	appCfg := config.LoadConfig()
+
 	// Initialize Database
 	db.InitDB("fnchatbot.db")
+
+	// Initialize authentication and authorization services.
+	if err := auth.Init(db.DB, appCfg.Auth); err != nil {
+		log.Fatalf("Failed to initialize auth: %v", err)
+	}
 
 	// Initialize Gin
 	r := gin.Default()
@@ -27,29 +37,39 @@ func main() {
 	config.AllowMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 	r.Use(cors.New(config))
 
-	// Routes
-	apiGroup := r.Group("/api")
+	// Public API routes (no auth required).
+	publicAPI := r.Group("/api")
 	{
-		apiGroup.GET("/ping", func(c *gin.Context) {
+		publicAPI.GET("/ping", func(c *gin.Context) {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "pong",
 			})
 		})
 
-		// Register REST API handlers
-		api.RegisterRoutes(apiGroup)
+		// Login is public; me/reset-password need JWT but not Casbin.
+		api.RegisterPublicAuthRoutes(publicAPI)
 	}
 
+	// Auth-required but Casbin-exempt routes (for password reset flow).
+	authOnlyAPI := publicAPI.Group("")
+	authOnlyAPI.Use(auth.JWTMiddleware())
+	api.RegisterAuthProtectedRoutes(authOnlyAPI)
+
+	// Protected API routes (require auth & authorization).
+	protectedAPI := publicAPI.Group("")
+	protectedAPI.Use(auth.JWTMiddleware(), auth.CasbinMiddleware())
+	api.RegisterRoutes(protectedAPI)
+
 	// WebSocket Route
-	r.GET("/ws/chat/:id", ws.HandleWebSocket)
+	r.GET("/ws/chat/:id", auth.WebSocketAuthMiddleware(), ws.HandleWebSocket)
 
 	// Serve Frontend Static Files (for production)
 	// r.StaticFS("/", http.Dir("./dist"))
 
 	// Start Server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	port := appCfg.Server.Port
+	if envPort := os.Getenv("PORT"); envPort != "" {
+		port = envPort
 	}
 
 	log.Printf("Server starting on port %s", port)

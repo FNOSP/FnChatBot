@@ -7,9 +7,9 @@ import (
 
 	"fnchatbot/internal/models"
 
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/tmc/langchaingo/llms"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 

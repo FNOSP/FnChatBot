@@ -63,6 +63,7 @@
     "modelServices": "Model Services",
     "mcpServers": "MCP Servers",
     "skillManagement": "Skill Management",
+    "userManagement": "User Management",
     "sandbox": "Sandbox",
     "providers": "Providers",
     "providerSettings": "Provider Settings",
@@ -131,6 +132,20 @@
       "fetchError": "Failed to fetch model list",
       "addSuccess": "Successfully added {count} models"
     }
+  },
+  "user": {
+    "role": {
+      "admin": "Admin",
+      "user": "User"
+    },
+    "username": "Username",
+    "description": "Description",
+    "enabled": "Enabled",
+    "addUser": "Add User",
+    "editUser": "Edit User",
+    "changePassword": "Change Password",
+    "newPassword": "New Password",
+    "confirmPassword": "Confirm Password"
   },
   "chat": {
     "placeholder": "Type a message...",

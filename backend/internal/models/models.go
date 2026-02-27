@@ -17,6 +17,7 @@ type ModelConfig struct {
 	Temperature float32   `gorm:"default:0.7" json:"temperature"`
 	MaxTokens   int       `gorm:"default:2048" json:"max_tokens"`
 	IsDefault   bool      `gorm:"default:false;index" json:"is_default"`
+	UserID      uint      `gorm:"index" json:"user_id"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -27,6 +28,7 @@ type Session struct {
 	Title     string      `gorm:"type:varchar(200);not null" json:"title"`
 	ModelID   uint        `json:"model_id"`
 	Model     ModelConfig `gorm:"foreignKey:ModelID" json:"model,omitempty"`
+	UserID    uint        `gorm:"index" json:"user_id"`
 	CreatedAt time.Time   `gorm:"index" json:"created_at"`
 	UpdatedAt time.Time   `json:"updated_at"`
 }

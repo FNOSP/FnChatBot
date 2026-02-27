@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { http } from '../../services/http'
 import { useI18n } from 'vue-i18n'
 import { 
   List, 
@@ -52,7 +52,7 @@ const saving = ref(false)
 const fetchServers = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8080/api/mcp')
+    const res = await http.get('/mcp')
     servers.value = res.data
   } catch (e) {
     console.error('Failed to fetch MCP servers', e)
@@ -76,7 +76,7 @@ const openEditDialog = (server: MCPConfig) => {
 const deleteServer = async (id: number) => {
   if (!confirm(t('common.deleteConfirm'))) return
   try {
-    await axios.delete(`http://localhost:8080/api/mcp/${id}`)
+    await http.delete(`/mcp/${id}`)
     await fetchServers()
   } catch (e) {
     console.error('Failed to delete server', e)
@@ -87,9 +87,9 @@ const saveServer = async () => {
   saving.value = true
   try {
     if (editingServer.value && editingServer.value.id) {
-      await axios.put(`http://localhost:8080/api/mcp/${editingServer.value.id}`, form.value)
+      await http.put(`/mcp/${editingServer.value.id}`, form.value)
     } else {
-      await axios.post('http://localhost:8080/api/mcp', form.value)
+      await http.post('/mcp', form.value)
     }
     await fetchServers()
     showDialog.value = false
@@ -107,7 +107,7 @@ const toggleServer = async (server: MCPConfig) => {
     server.enabled = newValue
     
     try {
-        await axios.put(`http://localhost:8080/api/mcp/${server.id}`, { ...server, enabled: newValue })
+        await http.put(`/mcp/${server.id}`, { ...server, enabled: newValue })
     } catch (e) {
         // Revert on error
         server.enabled = !newValue

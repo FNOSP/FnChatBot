@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { WebSocketService } from '../services/ws'
-import axios from 'axios'
+import { http } from '../services/http'
 
 export interface Message {
   role: 'user' | 'assistant' | 'system'
@@ -40,7 +40,7 @@ export const useChatStore = defineStore('chat', () => {
 
   const fetchModels = async () => {
     try {
-      const res = await axios.get('http://localhost:8080/api/models')
+      const res = await http.get('/models')
       models.value = res.data || []
       if (models.value.length === 0) {
         currentModelId.value = null

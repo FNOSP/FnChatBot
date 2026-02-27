@@ -2,9 +2,11 @@
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { MessageSquarePlus, Settings } from 'lucide-vue-next'
+import { useAuthStore } from '../../store/auth'
 
 const router = useRouter()
 const { t } = useI18n()
+const auth = useAuthStore()
 
 const navigateTo = (path: string) => {
   router.push(path)
@@ -12,7 +14,7 @@ const navigateTo = (path: string) => {
 </script>
 
 <template>
-  <aside class="w-64 bg-background text-foreground flex flex-col border-r border-border">
+  <aside class="w-64 bg-background text-foreground flex flex-col border-r border-border" v-if="auth.isAuthenticated">
     <div class="p-4 border-b border-border">
       <h1 class="text-xl font-bold flex items-center gap-2">
         <span>FnChatBot</span>

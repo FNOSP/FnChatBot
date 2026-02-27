@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
+import { http } from '../../services/http'
 import { useI18n } from 'vue-i18n'
 import {
   Layout,
@@ -45,7 +45,7 @@ const adding = ref(false)
 const fetchConfig = async () => {
   loading.value = true
   try {
-    const res = await axios.get('http://localhost:8080/api/sandbox')
+    const res = await http.get('/sandbox')
     enabled.value = res.data.enabled || false
     paths.value = res.data.paths || []
   } catch (e) {
@@ -57,7 +57,7 @@ const fetchConfig = async () => {
 
 const toggleEnabled = async (checked: boolean) => {
   try {
-    await axios.put('http://localhost:8080/api/sandbox', { enabled: checked })
+    await http.put('/sandbox', { enabled: checked })
     enabled.value = checked
     Toast.success(checked ? t('common.enabled') : t('common.disabled'))
   } catch (e) {
@@ -74,7 +74,7 @@ const addPath = async () => {
 
   adding.value = true
   try {
-    await axios.post('http://localhost:8080/api/sandbox/paths', {
+    await http.post('/sandbox/paths', {
       path: newPath.value.trim(),
       description: newDescription.value.trim()
     })
@@ -95,7 +95,7 @@ const addPath = async () => {
 
 const removePath = async (path: string) => {
   try {
-    await axios.delete(`http://localhost:8080/api/sandbox/paths/${encodeURIComponent(path)}`)
+    await http.delete(`/sandbox/paths/${encodeURIComponent(path)}`)
     paths.value = paths.value.filter(p => p.path !== path)
     Toast.success(t('common.deleteSuccess'))
   } catch (e) {

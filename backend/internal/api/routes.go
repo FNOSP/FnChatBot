@@ -51,4 +51,12 @@ func RegisterRoutes(r *gin.RouterGroup) {
 	r.PUT("/sandbox", UpdateSandboxConfig)
 	r.POST("/sandbox/paths", AddSandboxPath)
 	r.DELETE("/sandbox/paths/:path", RemoveSandboxPath)
+
+	// User management
+	r.GET("/users", GetUsers)
+	r.GET("/users/me", GetCurrentUser)
+	r.POST("/users", CreateUser)
+	r.PUT("/users/:id", UpdateUser)
+	r.PATCH("/users/:id", UpdateUser)
+	r.PATCH("/users/:id/password", ChangeUserPassword)
 }

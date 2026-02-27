@@ -63,6 +63,7 @@
     "modelServices": "模型服务",
     "mcpServers": "MCP 服务器",
     "skillManagement": "技能管理",
+    "userManagement": "用户管理",
     "sandbox": "沙箱设置",
     "providers": "供应商",
     "providerSettings": "供应商设置",
@@ -130,6 +131,20 @@
       "fetchError": "获取模型列表失败",
       "addSuccess": "成功添加 {count} 个模型"
     }
+  },
+  "user": {
+    "role": {
+      "admin": "管理员",
+      "user": "普通用户"
+    },
+    "username": "账号",
+    "description": "描述",
+    "enabled": "启用",
+    "addUser": "新增用户",
+    "editUser": "编辑用户",
+    "changePassword": "修改密码",
+    "newPassword": "新密码",
+    "confirmPassword": "确认密码"
   },
   "chat": {
     "placeholder": "输入消息...",

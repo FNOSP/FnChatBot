@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"fnchatbot/internal/auth"
 	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
 	"fnchatbot/internal/services"
@@ -17,6 +18,11 @@ func InitSandboxService() {
 }
 
 func GetSandboxConfig(c *gin.Context) {
+	if _, ok := auth.CurrentUser(c); !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	enabled := sandboxService.IsEnabled()
 	paths := sandboxService.GetAllPaths()
 
@@ -27,6 +33,15 @@ func GetSandboxConfig(c *gin.Context) {
 }
 
 func UpdateSandboxConfig(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	if !auth.IsAdmin(user) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
 	var input struct {
 		Enabled bool `json:"enabled"`
 	}
@@ -46,6 +61,15 @@ func UpdateSandboxConfig(c *gin.Context) {
 }
 
 func AddSandboxPath(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	if !auth.IsAdmin(user) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
 	var input models.SandboxPathInfo
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -69,6 +93,15 @@ func AddSandboxPath(c *gin.Context) {
 }
 
 func RemoveSandboxPath(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	if !auth.IsAdmin(user) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
 	path := c.Param("path")
 	if path == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "path is required"})

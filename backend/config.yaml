@@ -1,0 +1,10 @@
+server:
+  port: "8080"
+
+auth:
+  jwt_secret: "please-change-this-secret-in-production"
+  token_lifetime_seconds: 86400
+  initial_admin:
+    username: "admin"
+    password: "admin123"
+

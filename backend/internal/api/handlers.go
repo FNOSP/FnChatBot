@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"fnchatbot/internal/auth"
 	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
 
@@ -16,8 +17,14 @@ import (
 // --- Model Handlers ---
 
 func GetModels(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	var config []models.ModelConfig
-	if err := db.DB.Preload("ProviderRef").Find(&config).Error; err != nil {
+	if err := db.DB.Preload("ProviderRef").Where("user_id = ?", user.ID).Find(&config).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -35,6 +42,11 @@ type CreateModelConfigRequest struct {
 }
 
 func CreateModel(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 	var req CreateModelConfigRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -55,6 +67,7 @@ func CreateModel(c *gin.Context) {
 		Temperature: req.Temperature,
 		MaxTokens:   req.MaxTokens,
 		IsDefault:   req.IsDefault,
+		UserID:      user.ID,
 	}
 
 	if err := db.DB.Create(&config).Error; err != nil {
@@ -81,8 +94,14 @@ func resolveProviderID(providerID uint, providerKey string) (uint, error) {
 // --- Session Handlers ---
 
 func GetSessions(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	var sessions []models.Session
-	if err := db.DB.Order("created_at desc").Find(&sessions).Error; err != nil {
+	if err := db.DB.Where("user_id = ?", user.ID).Order("created_at desc").Find(&sessions).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -90,6 +109,11 @@ func GetSessions(c *gin.Context) {
 }
 
 func CreateSession(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 	var input struct {
 		Title   string `json:"title"`
 		ModelID uint   `json:"model_id"`
@@ -102,6 +126,7 @@ func CreateSession(c *gin.Context) {
 	session := models.Session{
 		Title:   input.Title,
 		ModelID: input.ModelID,
+		UserID:  user.ID,
 	}
 	if err := db.DB.Create(&session).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -111,7 +136,20 @@ func CreateSession(c *gin.Context) {
 }
 
 func GetSessionMessages(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	id := c.Param("id")
+	// Ensure session belongs to current user.
+	var session models.Session
+	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).First(&session).Error; err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
 	var messages []models.Message
 	if err := db.DB.Where("session_id = ?", id).Preload("Parts").Order("created_at asc").Find(&messages).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -121,8 +159,14 @@ func GetSessionMessages(c *gin.Context) {
 }
 
 func DeleteSession(c *gin.Context) {
+	user, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
 	id := c.Param("id")
-	if err := db.DB.Delete(&models.Session{}, id).Error; err != nil {
+	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).Delete(&models.Session{}).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}

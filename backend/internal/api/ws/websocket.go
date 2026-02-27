@@ -4,15 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net/http"
+	"strconv"
+	"sync"
+
+	"fnchatbot/internal/auth"
 	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
 	"fnchatbot/internal/services"
 	"fnchatbot/internal/services/llm"
 	"fnchatbot/internal/services/memory"
-	"log"
-	"net/http"
-	"strconv"
-	"sync"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -116,7 +118,18 @@ func HandleWebSocket(c *gin.Context) {
 		log.Printf("Failed to upgrade websocket: %v", err)
 		return
 	}
-	defer conn.Close()
+	// Close websocket and report errors to avoid silent failures.
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("Failed to close websocket: %v", err)
+		}
+	}()
+
+	currentUser, ok := auth.CurrentUser(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
 
 	for {
 		_, p, err := conn.ReadMessage()
@@ -133,16 +146,16 @@ func HandleWebSocket(c *gin.Context) {
 
 		switch msg.Type {
 		case TypeUserMessage:
-			handleUserMessage(conn, sessionID, msg)
+			handleUserMessage(conn, sessionID, msg, currentUser)
 		case TypeImage:
-			handleUserMessage(conn, sessionID, msg)
+			handleUserMessage(conn, sessionID, msg, currentUser)
 		case TypePermissionResponse:
 			HandlePermissionResponse(msg)
 		}
 	}
 }
 
-func handleUserMessage(conn *websocket.Conn, sessionIDStr string, msg WSMessage) {
+func handleUserMessage(conn *websocket.Conn, sessionIDStr string, msg WSMessage, currentUser *models.User) {
 	sessionID, err := strconv.ParseUint(sessionIDStr, 10, 32)
 	if err != nil {
 		log.Printf("Invalid session ID: %v", err)
@@ -154,6 +167,17 @@ func handleUserMessage(conn *websocket.Conn, sessionIDStr string, msg WSMessage)
 		log.Printf("Session not found: %v", err)
 		if err := sendJSON(conn, WSMessage{Type: TypeMessage, Content: "Error: Session not found."}); err != nil {
 			log.Printf("Failed to send error message: %v", err)
+		}
+		if err := sendJSON(conn, WSMessage{Type: TypeMessageEnd}); err != nil {
+			log.Printf("Failed to send message end: %v", err)
+		}
+		return
+	}
+
+	// Ensure only session owner or admin can access this session.
+	if currentUser == nil || (!auth.IsAdmin(currentUser) && session.UserID != currentUser.ID) {
+		if err := sendJSON(conn, WSMessage{Type: TypeMessage, Content: "Error: Forbidden."}); err != nil {
+			log.Printf("Failed to send forbidden message: %v", err)
 		}
 		if err := sendJSON(conn, WSMessage{Type: TypeMessageEnd}); err != nil {
 			log.Printf("Failed to send message end: %v", err)
@@ -205,8 +229,8 @@ func handleUserMessage(conn *websocket.Conn, sessionIDStr string, msg WSMessage)
 		log.Printf("Failed to save user message: %v", err)
 	}
 
-	// Prepare Tools
-	toolService := services.NewToolService()
+	// Prepare Tools scoped to session owner
+	toolService := services.NewToolService(session.UserID)
 	svcTools, _ := toolService.GetAvailableTools()
 	lcTools := convertToLangChainTools(svcTools)
 

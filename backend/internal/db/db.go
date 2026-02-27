@@ -31,6 +31,7 @@ func InitDB(dbPath string) {
 
 	// Auto Migrate the schema
 	err = DB.AutoMigrate(
+		&models.User{},
 		&models.Provider{},
 		&models.Model{},
 		&models.ModelConfig{},
