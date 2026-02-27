@@ -18,19 +18,19 @@ const progress = computed(() => totalCount.value ? (completedCount.value / total
 </script>
 
 <template>
-  <div class="bg-card border border-border rounded-lg overflow-hidden shadow-sm">
-    <div class="p-3 bg-muted/30 border-b border-border flex justify-between items-center">
-      <h3 class="font-medium text-sm">Plan & Progress</h3>
-      <span class="text-xs text-muted-foreground">{{ completedCount }}/{{ totalCount }}</span>
+  <div class="bg-bg-card border border-border rounded-lg overflow-hidden shadow-sm">
+    <div class="p-3 bg-bg-secondary border-b border-border flex justify-between items-center">
+      <h3 class="font-medium text-sm">Plan &amp; Progress</h3>
+      <span class="text-xs text-text-secondary">{{ completedCount }}/{{ totalCount }}</span>
     </div>
     
     <!-- Progress Bar -->
-    <div class="h-1 bg-secondary w-full">
+    <div class="h-1.5 bg-muted w-full">
       <div class="h-full bg-primary transition-all duration-500" :style="{ width: `${progress}%` }"></div>
     </div>
 
-    <div class="p-3 space-y-3 max-h-[300px] overflow-y-auto">
-      <div v-if="tasks.length === 0" class="text-xs text-muted-foreground text-center py-4">
+    <div class="p-3 space-y-3 max-h-[320px] overflow-y-auto">
+      <div v-if="tasks.length === 0" class="text-xs text-text-muted text-center py-4">
         No plan formulated yet.
       </div>
       

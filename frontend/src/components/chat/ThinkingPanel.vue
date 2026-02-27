@@ -11,19 +11,19 @@ const isExpanded = ref(false)
 </script>
 
 <template>
-  <div class="border border-border rounded-lg bg-bg-card mb-4 overflow-hidden">
+  <div class="border border-border rounded-lg bg-bg-card mb-3 overflow-hidden shadow-sm">
     <div 
       @click="isExpanded = !isExpanded"
-      class="flex items-center gap-2 p-3 bg-bg-secondary cursor-pointer text-sm font-medium hover:bg-bg-hover transition-colors"
+      class="flex items-center gap-2 px-3 py-2 bg-bg-secondary cursor-pointer text-xs md:text-sm font-medium hover:bg-bg-hover transition-colors"
     >
-      <component :is="isExpanded ? ChevronDownIcon : ChevronRightIcon" />
+      <component :is="isExpanded ? ChevronDownIcon : ChevronRightIcon" class="w-4 h-4" />
       <span>Thinking Process</span>
       <span v-if="tasks.length > 0" class="ml-auto text-xs text-text-secondary">
         {{ tasks.filter(t => t.status === 'completed').length }}/{{ tasks.length }} tasks
       </span>
     </div>
 
-    <div v-if="isExpanded" class="p-4 border-t border-border bg-bg-primary text-sm space-y-4">
+    <div v-if="isExpanded" class="p-3 border-t border-border bg-bg-primary text-xs md:text-sm space-y-3">
       <!-- Tasks List -->
       <div v-if="tasks.length > 0" class="space-y-2">
         <h4 class="font-semibold text-xs uppercase text-text-muted">Plan</h4>

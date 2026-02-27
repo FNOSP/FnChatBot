@@ -17,7 +17,7 @@ const segments = computed(() => {
   const content = props.message.content || ''
   const result: Segment[] = []
   
-  // Split by code blocks first
+  // Split message by code blocks first to preserve formatting
   const parts = content.split(/(```[\s\S]*?```)/g)
   
   parts.forEach(part => {
@@ -71,17 +71,30 @@ const segments = computed(() => {
 </script>
 
 <template>
-  <div class="flex gap-4 p-4 transition-colors rounded-lg hover:bg-bg-hover/50" :class="{'bg-bg-secondary': message.role === 'assistant'}">
-    <div class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm" 
-      :class="message.role === 'user' ? 'bg-primary' : 'bg-success'">
+  <div
+    class="flex gap-3 px-3 py-2 md:px-4 md:py-3 transition-colors"
+    :class="message.role === 'assistant' ? 'justify-start' : 'justify-end'"
+  >
+    <div
+      class="w-8 h-8 rounded-full flex items-center justify-center shrink-0 shadow-sm"
+      :class="message.role === 'user' ? 'bg-primary' : 'bg-success'"
+    >
       <UserIcon v-if="message.role === 'user'" class="text-white w-5 h-5" />
       <RobotIcon v-else class="text-white w-5 h-5" />
     </div>
     
-    <div class="flex-1 min-w-0 space-y-2">
-      <div class="font-semibold text-sm flex items-center gap-2 text-text-primary">
-        {{ message.role === 'user' ? 'You' : 'FnChatBot' }}
-        <span v-if="message.role === 'assistant'" class="text-xs font-normal text-text-muted bg-bg-primary px-1.5 py-0.5 rounded border border-border">
+    <div
+      class="max-w-[80%] md:max-w-[70%] space-y-2"
+      :class="message.role === 'assistant' ? 'items-start text-left' : 'items-end text-right'"
+    >
+      <div class="font-semibold text-xs md:text-sm flex items-center gap-2 text-text-primary">
+        <span>
+          {{ message.role === 'user' ? 'You' : 'FnChatBot' }}
+        </span>
+        <span
+          v-if="message.role === 'assistant'"
+          class="text-[10px] md:text-xs font-normal text-text-muted bg-bg-primary px-1.5 py-0.5 rounded-full border border-border"
+        >
            {{ message.tasks?.length ? 'Planning' : 'Responding' }}
         </span>
       </div>
@@ -93,17 +106,26 @@ const segments = computed(() => {
         :tasks="message.tasks || []" 
       />
 
-      <div class="space-y-2 text-sm text-text-primary">
+      <div
+        class="space-y-2 text-sm text-text-primary"
+        :class="message.role === 'assistant' ? 'text-left' : 'text-right'"
+      >
         <template v-for="(seg, idx) in segments" :key="idx">
           
           <!-- Text -->
-          <div v-if="seg.type === 'text'" class="whitespace-pre-wrap prose dark:prose-invert max-w-none">
+          <div
+            v-if="seg.type === 'text'"
+            class="inline-block whitespace-pre-wrap prose dark:prose-invert max-w-full rounded-2xl px-3 py-2 md:px-4 md:py-2.5 shadow-sm border"
+            :class="message.role === 'assistant'
+              ? 'bg-bg-secondary border-border text-left'
+              : 'bg-primary text-text-inverse border-transparent text-left'"
+          >
             {{ seg.content }}
           </div>
           
           <!-- Bash (Sandbox) -->
-          <div v-else-if="seg.type === 'bash'" class="relative group">
-            <div class="absolute -top-3 left-2 bg-warning/20 text-warning text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-warning/30 shadow-sm z-10">
+          <div v-else-if="seg.type === 'bash'" class="relative group inline-block max-w-full">
+            <div class="absolute -top-3 left-3 bg-warning/20 text-warning text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-warning/30 shadow-sm z-10">
               <SecuredIcon class="w-3 h-3" />
               Sandbox Mode
             </div>
@@ -116,13 +138,13 @@ const segments = computed(() => {
           </div>
           
           <!-- Other Code -->
-          <div v-else-if="seg.type === 'code'" class="bg-bg-secondary p-4 rounded-lg font-mono text-xs overflow-x-auto border border-border">
+          <div v-else-if="seg.type === 'code'" class="inline-block bg-bg-secondary p-4 rounded-lg font-mono text-xs overflow-x-auto border border-border max-w-full">
             <div class="text-xs text-text-muted mb-1 opacity-70">{{ seg.meta }}</div>
             <pre>{{ seg.content }}</pre>
           </div>
           
           <!-- Subagent -->
-          <div v-else-if="seg.type === 'subagent'" class="bg-info/10 border border-info/30 rounded-lg p-3 flex items-center gap-3">
+          <div v-else-if="seg.type === 'subagent'" class="inline-flex bg-info/10 border border-info/30 rounded-lg p-3 items-center gap-3 max-w-full">
              <div class="bg-info/20 p-1.5 rounded-md text-info">
                <RobotIcon class="w-4 h-4" />
              </div>
@@ -133,7 +155,7 @@ const segments = computed(() => {
           </div>
           
           <!-- Skill -->
-          <div v-else-if="seg.type === 'skill'" class="bg-accent/10 border border-accent/30 rounded-lg p-3 flex items-center gap-3">
+          <div v-else-if="seg.type === 'skill'" class="inline-flex bg-accent/10 border border-accent/30 rounded-lg p-3 items-center gap-3 max-w-full">
              <div class="bg-accent/20 p-1.5 rounded-md text-accent">
                <ThunderIcon class="w-4 h-4" />
              </div>
