@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { SendIcon, AddIcon, MoonIcon, SunnyIcon } from 'tdesign-icons-vue-next'
+import { SendIcon, MoonIcon, SunnyIcon, EnterIcon, CloseIcon } from 'tdesign-icons-vue-next'
 import MessageItem from '../components/chat/MessageItem.vue'
 import TaskPanel from '../components/chat/TaskPanel.vue'
 import { useChatStore } from '../store/chat'
@@ -19,14 +19,35 @@ const conversationId = ref(route.params.id as string || 'default')
 const inputValue = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 
+type AttachmentStatus = 'success' | 'progress' | 'fail' | 'default'
+
+// Basic attachment item type for the chat sender
+interface AttachmentItem {
+  key?: string | number
+  name: string
+  size?: number
+  status?: AttachmentStatus
+  description?: string
+  url?: string
+}
+
+// Attachment list shown in the chat sender
+const filesList = ref<AttachmentItem[]>([])
+// Whether to show the reference header above the sender
+const showReferenceHeader = ref(true)
+// Tooltip visibility for model select
+const allowToolTip = ref(false)
+
+// Map model list into select options for the dropdown
 const modelOptions = computed(() => {
   return models.value.map(m => ({
     value: m.id,
     label: m.name || m.model,
-    disabled: false
+    disabled: false,
   }))
 })
 
+// Keep the message list scrolled to the latest content
 const scrollToBottom = () => {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -44,22 +65,63 @@ watch(messages.value, () => {
   scrollToBottom()
 }, { deep: true })
 
+// Send current input as a chat message
 const handleSend = () => {
   if (!inputValue.value.trim() || isThinking.value) return
-  
+
   chatStore.sendMessage(inputValue.value)
   inputValue.value = ''
 }
 
-const handleKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    handleSend()
-  }
-}
-
+// Change the current chat model
 const handleModelChange = (value: number) => {
   chatStore.setCurrentModel(value)
+}
+
+// Handle closing the reference header above the sender
+const onRemoveRef = () => {
+  showReferenceHeader.value = false
+}
+
+// Handle new file selection and simulate upload progress
+const handleUploadFile = ({ files }: { files: File[] }) => {
+  const [file] = files
+  if (!file) return
+
+  const key = `${Date.now()}-${file.name}`
+
+  const newFile: AttachmentItem = {
+    key,
+    name: file.name,
+    size: file.size,
+    status: 'progress',
+    description: '上传中',
+  }
+
+  filesList.value = [newFile, ...filesList.value]
+
+  setTimeout(() => {
+    filesList.value = filesList.value.map(item =>
+      item.key === key
+        ? {
+            ...item,
+            status: 'success',
+            description: `${Math.floor(file.size / 1024)}KB`,
+          }
+        : item,
+    )
+  }, 1000)
+}
+
+// Remove attachment from the list
+const handleRemoveFile = (e: CustomEvent<AttachmentItem>) => {
+  const { key } = e.detail
+  filesList.value = filesList.value.filter(item => item.key !== key)
+}
+
+// Handle clicking on an attachment (placeholder for future preview/download)
+const handleFileClick = (e: CustomEvent<AttachmentItem>) => {
+  console.log('fileClick', e.detail)
 }
 </script>
 
@@ -82,15 +144,6 @@ const handleModelChange = (value: number) => {
       </div>
 
       <div class="flex items-center gap-4">
-        <t-select
-          :value="currentModelId"
-          :options="modelOptions"
-          @change="handleModelChange"
-          :placeholder="t('chat.selectModel')"
-          style="min-width: 220px;"
-          size="medium"
-          borderless
-        />
         <t-button
           variant="text"
           shape="square"
@@ -146,34 +199,87 @@ const handleModelChange = (value: number) => {
         <!-- Input Area -->
         <footer class="border-t border-border px-6 py-3 bg-bg-card/80 backdrop-blur">
           <div class="max-w-4xl mx-auto">
-            <div class="relative flex items-end gap-3">
-              <t-textarea 
-                v-model="inputValue"
-                @keydown="handleKeydown"
-                :placeholder="t('chat.placeholder') || 'Send a message...'" 
-                :autosize="{ minRows: 1, maxRows: 5 }"
-                class="w-full"
-              />
-              <t-button 
-                theme="primary"
-                shape="circle"
-                variant="base"
-                size="large"
-                class="mb-1"
-                @click="handleSend"
-                :disabled="!inputValue.trim() || isThinking"
-              >
-                <template #icon><SendIcon /></template>
-              </t-button>
-            </div>
-            <div class="flex items-center justify-between mt-2 text-xs text-text-muted">
-              <span>
-                {{ t('chat.helper') || 'Press Enter to send, Shift+Enter for new line.' }}
-              </span>
-              <span>
-                FnChatBot can make mistakes. Consider checking important information.
-              </span>
-            </div>
+            <t-chat-sender
+              v-model="inputValue"
+              class="chat-sender"
+              :textarea-props="{
+                placeholder: t('chat.placeholder') || 'Send a message...',
+              }"
+              :attachments-props="{
+                items: filesList,
+                overflow: 'scrollX',
+              }"
+              :loading="isThinking"
+              @send="handleSend"
+              @file-select="handleUploadFile"
+              @file-click="handleFileClick"
+              @remove="handleRemoveFile"
+            >
+              <template #suffix="{ renderPresets }">
+                <component :is="renderPresets([{ name: 'uploadImage' }, { name: 'uploadAttachment' }])" />
+              </template>
+              <template #footer-prefix>
+                <div class="model-select">
+                  <t-tooltip
+                    v-model:visible="allowToolTip"
+                    :content="t('chat.switchModel') || '切换模型'"
+                    trigger="hover"
+                  >
+                    <t-select
+                      :value="currentModelId"
+                      :options="modelOptions"
+                      @change="handleModelChange"
+                      @focus="allowToolTip = false"
+                      :placeholder="t('chat.selectModel')"
+                      size="small"
+                      style="min-width: 220px;"
+                    />
+                  </t-tooltip>
+                  <div class="sender-helper">
+                    <div class="sender-helper-main">
+                      <EnterIcon
+                        :size="'18px'"
+                        :style="{ color: 'var(--td-text-color-disabled)', transform: 'scaleX(-1)', padding: '2px' }"
+                      />
+                      <span>
+                        {{ t('chat.helper') || 'Press Enter to send, Shift+Enter for new line.' }}
+                      </span>
+                    </div>
+                    <span class="sender-helper-sub">
+                      FnChatBot can make mistakes. Consider checking important information.
+                    </span>
+                  </div>
+                </div>
+              </template>
+              <template v-if="showReferenceHeader" #inner-header>
+                <div
+                  :style="{
+                    display: 'flex',
+                    width: '100%',
+                    marginBottom: '8px',
+                    paddingBottom: '8px',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    borderBottom: '1px solid var(--td-component-stroke)',
+                  }"
+                >
+                  <div :style="{ flex: 1, display: 'flex', alignItems: 'center' }">
+                    <EnterIcon
+                      :size="'20px'"
+                      :style="{ color: 'var(--td-text-color-disabled)', transform: 'scaleX(-1)', padding: '6px' }"
+                    />
+                    <p :style="{ fontSize: '14px', color: 'var(--td-text-color-placeholder)', marginLeft: '4px' }">
+                      “牛顿第一定律（惯性定律）仅适用于惯性参考系，而不适用于非惯性参考系。”
+                    </p>
+                  </div>
+                  <CloseIcon
+                    :size="'20px'"
+                    :style="{ color: 'var(--td-text-color-disabled)', padding: '6px', cursor: 'pointer' }"
+                    @click="onRemoveRef"
+                  />
+                </div>
+              </template>
+            </t-chat-sender>
           </div>
         </footer>
       </section>
@@ -188,4 +294,34 @@ const handleModelChange = (value: number) => {
     </main>
   </div>
 </template>
+
+<style scoped>
+.chat-sender .model-select {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-sender .sender-helper {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--td-text-color-placeholder);
+}
+
+.chat-sender .sender-helper-main {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.chat-sender .sender-helper-sub {
+  font-size: 11px;
+  opacity: 0.8;
+}
+</style>
 

@@ -12,6 +12,7 @@
     "lint:fix": "eslint . --ext .ts,.vue --fix"
   },
   "dependencies": {
+    "@tdesign-vue-next/chat": "^0.4.6",
     "@types/markdown-it": "^14.1.2",
     "axios": "^1.13.5",
     "clsx": "^2.1.1",
