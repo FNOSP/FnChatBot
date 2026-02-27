@@ -1,0 +1,12 @@
+- [x] TDesign 依赖安装完成，Semi Design 依赖已移除
+- [x] 全局布局使用 TDesign Layout 组件重构完成
+- [x] 侧边栏导航使用 TDesign Menu 组件重构完成
+- [x] 对话界面 (ChatView) 使用 TDesign 风格重构完成，消息气泡和输入框样式符合预期
+- [x] 思考过程 (Thinking/Reasoning) 组件实现并能正确展示
+- [x] 设置页面 (SettingsView) 及其子组件全部使用 TDesign 表单组件重构完成
+- [x] 模型服务配置 (ModelServices) 功能正常（URL 预览、Token 掩码）
+- [x] MCP 服务器和 Skill 管理界面功能正常
+- [x] 弹窗和通知系统使用 TDesign 组件替换完成
+- [x] 主题切换 (深色/浅色) 在所有新组件上工作正常
+- [x] 国际化 (i18n) 在所有新组件上工作正常
+- [x] 项目无构建错误，运行流畅

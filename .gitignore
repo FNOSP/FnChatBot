@@ -12,3 +12,4 @@
 *.sln
 *.sw?
 .vite
+/.trae/skills/dev-browser/profiles/

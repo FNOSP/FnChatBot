@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { Layout, Card, Select, SelectOption } from '@kousum/semi-ui-vue';
 
 const { locale, t } = useI18n();
 
@@ -14,7 +13,7 @@ const languageOptions = [
 
 const currentLanguage = ref(locale.value);
 
-const handleLanguageChange = (value: string | number | any[]) => {
+const handleLanguageChange = (value: string | number | any) => {
   const val = String(value);
   locale.value = val;
   currentLanguage.value = val;
@@ -23,38 +22,23 @@ const handleLanguageChange = (value: string | number | any[]) => {
 </script>
 
 <template>
-  <Layout class="h-full w-full">
-    <Card :title="t('settings.general')" :bordered="false" class="h-full bg-transparent shadow-none">
+  <div class="h-full w-full p-4">
+    <t-card :title="t('settings.general')" :bordered="false" class="bg-transparent shadow-none">
       <div class="flex flex-col gap-6">
-        <div class="flex items-center justify-between p-4 border border-zinc-200 dark:border-zinc-800 rounded-lg bg-card">
+        <div class="flex items-center justify-between p-4 border border-border rounded-lg bg-bg-card">
           <div class="flex flex-col">
-            <span class="text-base font-medium">{{ t('settings.language') }}</span>
-            <span class="text-sm text-zinc-500">{{ t('settings.languageDesc') }}</span>
+            <span class="text-base font-medium text-text-primary">{{ t('settings.language') }}</span>
+            <span class="text-sm text-text-secondary">{{ t('settings.languageDesc') }}</span>
           </div>
-          <Select 
-            :value="currentLanguage" 
+          <t-select 
+            v-model="currentLanguage" 
             style="width: 200px" 
             @change="handleLanguageChange"
-          >
-            <SelectOption v-for="opt in languageOptions" :key="opt.value" :value="opt.value" :label="opt.label">
-              {{ opt.label }}
-            </SelectOption>
-          </Select>
+            :options="languageOptions"
+          />
         </div>
-
       </div>
-    </Card>
-  </Layout>
+    </t-card>
+  </div>
 </template>
 
-<style scoped>
-/* Ensure Semi UI components blend with existing Tailwind styles if needed */
-:deep(.semi-card-header) {
-  padding-left: 0;
-  padding-right: 0;
-}
-:deep(.semi-card-body) {
-  padding-left: 0;
-  padding-right: 0;
-}
-</style>

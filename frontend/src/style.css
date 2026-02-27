@@ -120,6 +120,12 @@
     @apply border-border;
   }
 
+  html,
+  body,
+  #app {
+    min-height: 100vh;
+  }
+
   body {
     background-color: var(--bg-primary);
     color: var(--text-primary);

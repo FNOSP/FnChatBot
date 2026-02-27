@@ -2,28 +2,15 @@
 import { ref, onMounted } from 'vue'
 import { http } from '../../services/http'
 import { useI18n } from 'vue-i18n'
+import { MessagePlugin } from 'tdesign-vue-next'
 import { 
-  List, 
-  ListItem,
-  Button, 
-  Modal, 
-  Switch,
-  Typography, 
-  Spin,
-  Tag,
-  Space,
-  Empty,
-  Upload
-} from '@kousum/semi-ui-vue'
-import { 
-  IconWrench, 
-  IconPlus, 
-  IconDelete, 
-  IconUpload,
-  IconFile
-} from '@kousum/semi-icons-vue'
+  ToolsIcon, 
+  AddIcon, 
+  DeleteIcon, 
+  UploadIcon,
+  FileIcon
+} from 'tdesign-icons-vue-next'
 
-const { Title, Text } = Typography
 const { t } = useI18n()
 
 // --- Types ---
@@ -38,7 +25,7 @@ interface Skill {
 const skills = ref<Skill[]>([])
 const loading = ref(false)
 const showUploadDialog = ref(false)
-const uploadFile = ref<File | null>(null)
+const uploadFiles = ref<any[]>([]) // TDesign upload files
 const uploading = ref(false)
 const uploadError = ref('')
 
@@ -51,6 +38,7 @@ const fetchSkills = async () => {
     skills.value = res.data
   } catch (e) {
     console.error('Failed to fetch skills', e)
+    MessagePlugin.error(t('common.error'))
   } finally {
     loading.value = false
   }
@@ -64,42 +52,48 @@ const toggleSkill = async (skill: Skill) => {
   
   try {
     await http.patch(`/skills/${skill.id}`, { enabled: newValue })
+    MessagePlugin.success(skill.enabled ? t('common.enabled') : t('common.disabled'))
   } catch (e) {
     // Revert
     skill.enabled = !newValue
     console.error('Failed to toggle skill', e)
+    MessagePlugin.error(t('common.error'))
   }
 }
 
 // Delete a single skill by id
 const deleteSkill = async (id: number) => {
-  if (!confirm(t('common.deleteConfirm'))) return
+  const confirm = window.confirm(t('common.deleteConfirm'))
+  if (!confirm) return
   try {
     await http.delete(`/skills/${id}`)
     await fetchSkills()
+    MessagePlugin.success(t('common.success'))
   } catch (e) {
     console.error('Failed to delete skill', e)
+    MessagePlugin.error(t('common.error'))
   }
 }
 
 // Capture selected file and prevent auto upload
-const beforeUpload = (file: any) => {
-    // Semi UI Upload component passes a File object
-    // We want to prevent default upload and handle it manually
-    uploadFile.value = file
+const beforeUpload = (file: File) => {
+    // TDesign upload might handle file list, but we want single file control
     uploadError.value = ''
     return false // Return false to prevent auto upload
 }
 
 // Upload selected skill file to backend
 const uploadSkill = async () => {
-  if (!uploadFile.value) return
+  if (uploadFiles.value.length === 0) return
   
+  const file = uploadFiles.value[0].raw
+  if (!file) return
+
   uploading.value = true
   uploadError.value = ''
   
   const formData = new FormData()
-  formData.append('file', uploadFile.value)
+  formData.append('file', file)
   
   try {
     await http.post('/skills/upload', formData, {
@@ -109,18 +103,19 @@ const uploadSkill = async () => {
     })
     await fetchSkills()
     showUploadDialog.value = false
-    uploadFile.value = null
+    uploadFiles.value = []
+    MessagePlugin.success(t('common.success'))
   } catch (e: any) {
     console.error('Failed to upload skill', e)
     uploadError.value = e.response?.data?.error || 'Upload failed'
+    MessagePlugin.error(uploadError.value)
   } finally {
     uploading.value = false
   }
 }
 
-// Clear selected skill file and related error
 const handleRemoveFile = () => {
-    uploadFile.value = null
+    uploadFiles.value = []
     uploadError.value = ''
 }
 
@@ -133,121 +128,126 @@ onMounted(() => {
   <div class="space-y-6">
     <div class="flex items-center justify-between">
       <div>
-        <Title :heading="3" class="flex items-center gap-2">
-            <IconWrench />
+        <h3 class="flex items-center gap-2 text-lg font-bold">
+            <ToolsIcon />
             {{ t('skills.title') }}
-        </Title>
-        <Text type="secondary">
+        </h3>
+        <span class="text-text-secondary">
             {{ t('skills.description') }}
-        </Text>
+        </span>
       </div>
-      <Button 
-        theme="solid" 
-        type="primary" 
-        :icon="IconPlus" 
+      <t-button 
+        theme="primary" 
         @click="showUploadDialog = true"
       >
+        <template #icon><AddIcon /></template>
         {{ t('skills.addSkill') }}
-      </Button>
+      </t-button>
     </div>
 
     <!-- List -->
-    <Spin :spinning="loading">
+    <t-loading :loading="loading">
         <div v-if="skills.length === 0 && !loading" class="text-center py-12">
-            <Empty 
-                :image="IconWrench" 
-                :title="t('skills.noSkills')" 
-                :description="t('skills.noSkillsDesc')"
-            >
-                 <Button @click="showUploadDialog = true">{{ t('skills.uploadSkill') }}</Button>
-            </Empty>
+            <div class="flex flex-col items-center gap-4">
+                <ToolsIcon size="48" class="text-text-muted" />
+                <h4 class="text-lg font-bold">{{ t('skills.noSkills') }}</h4>
+                <p class="text-text-secondary">{{ t('skills.noSkillsDesc') }}</p>
+                <t-button @click="showUploadDialog = true">{{ t('skills.uploadSkill') }}</t-button>
+            </div>
         </div>
 
-        <List
+        <t-list
             v-else
-            bordered
-            class="bg-card rounded-lg"
+            :split="true"
+            class="bg-bg-card rounded-lg border border-border"
         >
-                <ListItem v-for="item in skills" :key="item.id" class="hover:bg-accent/50 transition-colors">
+            <t-list-item v-for="item in skills" :key="item.id" class="hover:bg-bg-hover transition-colors">
+                <div class="flex items-center justify-between w-full">
                     <div class="flex items-center gap-3">
-                        <div class="p-2 bg-muted rounded">
-                            <IconWrench />
+                        <div class="p-2 bg-bg-secondary rounded">
+                            <ToolsIcon />
                         </div>
                         <div class="flex flex-col">
                             <div class="flex items-center gap-2">
-                                <span class="font-medium">{{ item.name }}</span>
-                                <Tag :color="item.enabled ? 'green' : 'grey'" size="small">
+                                <span class="font-medium text-text-primary">{{ item.name }}</span>
+                                <t-tag :theme="item.enabled ? 'success' : 'default'" size="small">
                                     {{ item.enabled ? t('common.enabled') : t('common.disabled') }}
-                                </Tag>
+                                </t-tag>
                             </div>
-                            <Text type="secondary">{{ item.description }}</Text>
+                            <span class="text-xs text-text-secondary">{{ item.description }}</span>
                         </div>
                     </div>
-                    <template #extra>
-                        <Space>
-                            <Switch 
-                                :checked="item.enabled" 
-                                @change="() => toggleSkill(item)"
-                                size="small"
-                            />
-                            <Button
-                                :icon="IconDelete"
-                                theme="borderless"
-                                type="danger"
-                                @click="deleteSkill(item.id)"
-                            />
-                        </Space>
-                    </template>
-                </ListItem>
-        </List>
-    </Spin>
+                    <div class="flex items-center gap-2">
+                        <t-switch 
+                            :value="item.enabled" 
+                            @change="() => toggleSkill(item)"
+                            size="small"
+                        />
+                        <t-button
+                            variant="text"
+                            shape="square"
+                            theme="danger"
+                            @click="deleteSkill(item.id)"
+                        >
+                            <template #icon><DeleteIcon /></template>
+                        </t-button>
+                    </div>
+                </div>
+            </t-list-item>
+        </t-list>
+    </t-loading>
 
     <!-- Upload Dialog -->
-    <Modal
-        :visible="showUploadDialog"
-        :title="t('skills.uploadTitle')"
-        :okText="t('skills.uploadSkill')"
-        :cancelText="t('common.cancel')"
-        @ok="uploadSkill"
+    <t-dialog
+        v-model:visible="showUploadDialog"
+        :header="t('skills.uploadTitle')"
+        :confirm-btn="t('skills.uploadSkill')"
+        :cancel-btn="t('common.cancel')"
+        @confirm="uploadSkill"
         @cancel="showUploadDialog = false"
-        :confirmLoading="uploading"
-        :okButtonProps="{ disabled: !uploadFile }"
+        :confirm-loading="uploading"
+        :confirm-btn-props="{ disabled: uploadFiles.length === 0 }"
     >
-        <Upload
+        <t-upload
+            v-model="uploadFiles"
             action="#"
-            :beforeUpload="beforeUpload"
-            :showUploadList="false"
-            drag
+            :before-upload="beforeUpload"
+            :auto-upload="false"
+            theme="custom"
+            draggable
             accept=".md,.zip,.json"
+            class="w-full"
         >
-             <div class="p-8 text-center cursor-pointer">
-                <IconUpload size="extra-large" class="text-muted-foreground mb-4" />
+             <div class="p-8 text-center cursor-pointer border-2 border-dashed border-border rounded-lg hover:border-brand transition-colors bg-bg-secondary/30">
+                <UploadIcon size="32" class="text-text-muted mb-4 mx-auto" />
                 <div class="mt-2">
-                    <div v-if="uploadFile" class="flex flex-col items-center">
-                        <Space>
-                            <IconFile /> 
-                            <span>{{ t('skills.fileSelected', { name: uploadFile.name }) }}</span>
-                            <Button 
-                                type="tertiary" 
-                                theme="borderless" 
-                                :icon="IconDelete" 
+                    <div v-if="uploadFiles.length > 0" class="flex flex-col items-center">
+                        <div class="flex items-center gap-2">
+                            <FileIcon /> 
+                            <span>{{ t('skills.fileSelected', { name: uploadFiles[0].name }) }}</span>
+                            <t-button 
+                                variant="text" 
+                                shape="square" 
+                                theme="danger"
                                 size="small"
                                 @click.stop="handleRemoveFile"
-                            />
-                        </Space>
+                            >
+                                <template #icon><DeleteIcon /></template>
+                            </t-button>
+                        </div>
                     </div>
-                    <div v-else>
+                    <div v-else class="text-text-primary font-medium">
                         {{ t('skills.dragDrop') }}
                     </div>
                 </div>
-                <div class="text-xs text-muted-foreground mt-2">
+                <div class="text-xs text-text-secondary mt-2">
                     {{ t('skills.supports') }}
                 </div>
             </div>
-        </Upload>
-        <div v-if="uploadError" class="text-sm text-red-500 mt-2">
+        </t-upload>
+        <div v-if="uploadError" class="text-sm text-error mt-2">
             {{ uploadError }}
         </div>
-    </Modal>
+    </t-dialog>
   </div>
 </template>

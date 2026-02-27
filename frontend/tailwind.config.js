@@ -40,6 +40,28 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        // Custom mappings for TDesign refactor
+        bg: {
+          primary: "var(--bg-primary)",
+          secondary: "var(--bg-secondary)",
+          card: "var(--bg-card)",
+          hover: "var(--bg-hover)",
+          "secondary-active": "var(--bg-secondary)", // fallback
+        },
+        text: {
+          primary: "var(--text-primary)",
+          secondary: "var(--text-secondary)",
+          muted: "var(--text-muted)",
+          inverse: "var(--text-inverse)",
+        },
+        brand: {
+          DEFAULT: "var(--accent-primary)",
+          light: "var(--accent-secondary)", // approx
+        },
+        success: "var(--success)",
+        warning: "var(--warning)",
+        error: "var(--error)",
+        info: "var(--info)",
       },
       borderRadius: {
         lg: "var(--radius)",

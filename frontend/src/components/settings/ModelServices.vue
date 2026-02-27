@@ -4,36 +4,16 @@ import { http } from '../../services/http'
 import { useI18n } from 'vue-i18n'
 import { useTheme } from '../../composables/useTheme'
 import { predefinedProviders } from '../../data/providers'
+import { MessagePlugin } from 'tdesign-vue-next'
 import {
-  Layout,
-  LayoutSider,
-  LayoutContent,
-  List,
-  ListItem,
-  Input,
-  Button,
-  Table,
-  TypographyText,
-  TypographyTitle,
-  Card,
-  Space,
-  Switch,
-  Modal,
-  Toast,
-  Spin,
-  Tag,
-  Empty
-} from '@kousum/semi-ui-vue'
-import type { ColumnProps } from '@kousum/semi-ui-vue/dist/table/interface'
-import {
-  IconPlus,
-  IconDelete,
-  IconSetting,
-  IconGlobe,
-  IconRefresh,
-  IconSearch,
-  IconServer
-} from '@kousum/semi-icons-vue'
+  AddIcon,
+  DeleteIcon,
+  SettingIcon,
+  InternetIcon,
+  RefreshIcon,
+  SearchIcon,
+  ServerIcon
+} from 'tdesign-icons-vue-next'
 
 const { t } = useI18n()
 const { isDark } = useTheme()
@@ -88,7 +68,6 @@ const buildDefaultProviders = (): Provider[] => {
 }
 
 const normalizeProvidersResponse = (data: any): Provider[] => {
-  // Normalize API response to avoid empty list when shape differs
   if (Array.isArray(data)) return data
   if (Array.isArray(data?.providers)) return data.providers
   if (Array.isArray(data?.data)) return data.data
@@ -102,8 +81,7 @@ const filteredProviders = computed(() => {
     const name = (p.name || '').toLowerCase()
     const providerId = (p.provider_id || '').toLowerCase()
     return name.includes(query) || providerId.includes(query)
-  }
-  )
+  })
 })
 
 const selectedProvider = computed(() => {
@@ -135,10 +113,10 @@ const getDefaultProviderId = (list: Provider[]) => {
   return sortedAll[0]?.provider_id || null
 }
 
-const columns = computed((): ColumnProps<Model>[] => [
-  { title: t('settings.displayName'), key: 'name', dataIndex: 'name' },
-  { title: t('settings.modelId'), key: 'model_id', dataIndex: 'model_id' },
-  { title: t('common.actions'), key: 'actions', width: 120, align: 'right' }
+const columns = computed(() => [
+  { title: t('settings.displayName'), colKey: 'name', width: 200 },
+  { title: t('settings.modelId'), colKey: 'model_id', width: 200 },
+  { title: t('common.actions'), colKey: 'actions', width: 100, align: 'right' }
 ])
 
 const fetchProviders = async () => {
@@ -146,7 +124,6 @@ const fetchProviders = async () => {
   try {
     const res = await http.get('/providers')
     const backendProviders = normalizeProvidersResponse(res.data)
-    // #endregion
     
     const mergedProviders: Provider[] = predefinedProviders.map(predefined => {
       const existing = backendProviders.find(bp => bp.provider_id === predefined.id)
@@ -184,7 +161,7 @@ const fetchProviders = async () => {
     }
   } catch (e) {
     console.error('Failed to fetch providers', e)
-    Toast.error(t('common.error'))
+    MessagePlugin.error(t('common.error'))
   } finally {
     loading.value = false
   }
@@ -201,11 +178,11 @@ const toggleProvider = async (provider: Provider) => {
   
   try {
     await http.patch(`/providers/${provider.id}/toggle`)
-    Toast.success(provider.enabled ? t('common.enabled') : t('common.disabled'))
+    MessagePlugin.success(provider.enabled ? t('common.enabled') : t('common.disabled'))
   } catch (e) {
     provider.enabled = previousState
     console.error('Failed to toggle provider', e)
-    Toast.error(t('common.error'))
+    MessagePlugin.error(t('common.error'))
   }
 }
 
@@ -233,10 +210,10 @@ const saveProvider = async () => {
       p.id = res.data.id
     }
     
-    Toast.success(t('common.success'))
+    MessagePlugin.success(t('common.success'))
   } catch (e) {
     console.error('Failed to save provider', e)
-    Toast.error(t('common.error'))
+    MessagePlugin.error(t('common.error'))
   } finally {
     saving.value = false
   }
@@ -247,11 +224,10 @@ const fetchRemoteModels = async () => {
   
   const p = selectedProvider.value
   if (!p.base_url || !p.api_key) {
-    Toast.error(t('settings.modelList.noConfig'))
+    MessagePlugin.error(t('settings.modelList.noConfig'))
     return
   }
   
-  // Ensure provider exists before fetching remote models
   if (!p.id) {
     await saveProvider()
   }
@@ -268,11 +244,11 @@ const fetchRemoteModels = async () => {
     if (availableModels.value.length > 0) {
       modelListVisible.value = true
     } else {
-      Toast.warning(t('settings.modelList.noModelsFound'))
+      MessagePlugin.warning(t('settings.modelList.noModelsFound'))
     }
   } catch (e: any) {
     console.error('Failed to fetch remote models', e)
-    Toast.error(e.response?.data?.error || t('settings.modelList.fetchError'))
+    MessagePlugin.error(e.response?.data?.error || t('settings.modelList.fetchError'))
   } finally {
     modelListLoading.value = false
   }
@@ -298,10 +274,10 @@ const addRemoteModel = async (model: { id: string; name: string; owned_by?: stri
       selectedProvider.value.models = []
     }
     selectedProvider.value.models.push(res.data)
-    Toast.success(t('common.success'))
+    MessagePlugin.success(t('common.success'))
   } catch (e) {
     console.error('Failed to add model', e)
-    Toast.error(t('common.error'))
+    MessagePlugin.error(t('common.error'))
   } finally {
     saving.value = false
   }
@@ -316,10 +292,10 @@ const removeRemoteModel = async (modelId: string) => {
   try {
     await http.delete(`/models/${target.id}`)
     selectedProvider.value.models = selectedProvider.value.models?.filter(m => m.id !== target.id) || []
-    Toast.success(t('common.success'))
+    MessagePlugin.success(t('common.success'))
   } catch (e) {
     console.error('Failed to delete model', e)
-    Toast.error(t('common.error'))
+    MessagePlugin.error(t('common.error'))
   } finally {
     saving.value = false
   }
@@ -344,10 +320,10 @@ const removeModel = async (model: Model) => {
     try {
       await http.delete(`/models/${model.id}`)
       selectedProvider.value.models = selectedProvider.value.models?.filter(m => m.id !== model.id) || []
-      Toast.success(t('common.success'))
+      MessagePlugin.success(t('common.success'))
     } catch (e) {
       console.error('Failed to delete model', e)
-      Toast.error(t('common.error'))
+      MessagePlugin.error(t('common.error'))
     }
   } else {
     selectedProvider.value.models = selectedProvider.value.models?.filter(m => m !== model) || []
@@ -368,332 +344,302 @@ const saveModel = async (model: Model) => {
       const res = await http.post(`/providers/${selectedProvider.value.id}/models`, payload)
       model.id = res.data.id
     }
-    Toast.success(t('common.success'))
+    MessagePlugin.success(t('common.success'))
   } catch (e) {
     console.error('Failed to save model', e)
-    Toast.error(t('common.error'))
+    MessagePlugin.error(t('common.error'))
   }
 }
 
 const getProviderIcon = (providerId: string) => {
-  if (providerId === 'openai') return IconGlobe
-  if (providerId === 'anthropic') return IconServer
-  if (providerId === 'ollama') return IconServer
-  return IconSetting
+  if (providerId === 'openai') return InternetIcon
+  if (providerId === 'anthropic') return ServerIcon
+  if (providerId === 'ollama') return ServerIcon
+  return SettingIcon
 }
 
 onMounted(() => {
   fetchProviders()
 })
-
-watch(selectedProviderId, () => {
-})
 </script>
 
 <template>
-  <div class="model-services h-full text-foreground" :class="isDark ? 'bg-zinc-900' : 'bg-white'">
-    <Layout class="h-full border rounded-lg overflow-hidden" :class="isDark ? 'bg-zinc-900' : 'bg-white'">
-      <LayoutSider
-        class="border-r flex flex-col"
-        :class="isDark ? 'bg-zinc-900/50' : 'bg-gray-50'"
-        :style="{ width: '18rem', minWidth: '18rem' }"
+  <div class="h-full text-text-primary bg-bg-primary">
+    <t-layout class="h-full border border-border rounded-lg overflow-hidden bg-bg-card">
+      <t-aside
+        class="border-r border-border flex flex-col bg-bg-secondary"
+        width="18rem"
       >
-        <div class="p-4 border-b" :class="isDark ? 'border-zinc-700' : 'border-gray-200'">
-          <TypographyTitle :heading="5" class="mb-3">{{ t('settings.providers') }}</TypographyTitle>
-          <Input
+        <div class="p-4 border-b border-border">
+          <h3 class="text-lg font-bold mb-3">{{ t('settings.providers') }}</h3>
+          <t-input
             v-model="searchQuery"
             :placeholder="t('common.search')"
-            :prefix-icon="IconSearch"
             size="small"
             class="w-full"
-          />
+          >
+            <template #prefix-icon>
+              <SearchIcon />
+            </template>
+          </t-input>
         </div>
         
         <div class="flex-1 min-h-0 overflow-y-auto">
-          <Spin :spinning="loading">
-            <List class="provider-list">
-              <ListItem
+          <t-loading :loading="loading" class="w-full h-full">
+            <t-list class="provider-list" :split="true">
+              <t-list-item
                 v-for="item in filteredProviders"
                 :key="item.provider_id"
                 :class="[
                   'cursor-pointer transition-colors border-l-2',
-                  isDark ? 'hover:bg-white/5 border-transparent' : 'hover:bg-black/5 border-transparent',
-                  selectedProviderId === item.provider_id ? (isDark ? 'bg-white/10 border-primary' : 'bg-primary/10 border-primary') : ''
+                  'hover:bg-bg-hover border-transparent',
+                  selectedProviderId === item.provider_id ? 'bg-brand-light border-brand' : ''
                 ]"
                 @click="selectedProviderId = item.provider_id"
               >
                 <div class="flex items-center justify-between w-full px-4 py-3">
                   <div class="flex items-center gap-3 min-w-0">
                     <div 
-                      class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0" 
-                      :class="isDark ? 'bg-zinc-800' : 'bg-gray-200'"
+                      class="w-8 h-8 rounded flex items-center justify-center flex-shrink-0 bg-bg-secondary-active" 
                     >
-                      <component :is="getProviderIcon(item.provider_id)" class="text-gray-500" />
+                      <component :is="getProviderIcon(item.provider_id)" class="text-text-secondary" />
                     </div>
                     <div class="min-w-0 flex-1">
                       <div class="flex items-center gap-2">
-                        <span class="font-medium text-sm truncate">{{ item.name }}</span>
-                        <Tag v-if="item.enabled" color="green" size="small">ON</Tag>
+                        <span class="font-medium text-sm truncate text-text-primary">{{ item.name }}</span>
+                        <t-tag v-if="item.enabled" theme="success" size="small" variant="light">ON</t-tag>
                       </div>
-                      <TypographyText type="secondary" size="small" class="truncate block">
+                      <span class="text-xs text-text-secondary truncate block">
                         {{ item.models?.length || 0 }} {{ t('settings.models') }}
-                      </TypographyText>
+                      </span>
                     </div>
                   </div>
                   
-                  <Switch 
+                  <t-switch 
                     size="small" 
-                    :checked="item.enabled"
+                    :value="item.enabled"
                     @change="() => toggleProvider(item)"
                     @click.stop
                   />
                 </div>
-              </ListItem>
-            </List>
-          </Spin>
+              </t-list-item>
+            </t-list>
+          </t-loading>
         </div>
-      </LayoutSider>
+      </t-aside>
 
-      <LayoutContent :class="isDark ? 'bg-zinc-900' : 'bg-white'">
+      <t-content class="bg-bg-primary">
         <div v-if="selectedProvider" class="h-full flex flex-col">
-          <div class="flex items-center justify-between p-6 border-b" :class="isDark ? 'border-zinc-700' : 'border-gray-200'">
+          <div class="flex items-center justify-between p-6 border-b border-border">
             <div>
-              <TypographyTitle :heading="4">
+              <h4 class="text-lg font-bold">
                 {{ selectedProvider.name }}
-              </TypographyTitle>
-              <TypographyText type="secondary" size="small">
+              </h4>
+              <span class="text-sm text-text-secondary">
                 {{ t('settings.configDesc', { name: selectedProvider.name }) }}
-              </TypographyText>
+              </span>
             </div>
-            <Space>
-              <Button 
-                theme="solid" 
-                type="primary"
+            <div class="flex gap-2">
+              <t-button 
+                theme="primary"
                 :loading="saving"
                 @click="saveProvider"
               >
                 {{ t('common.save') }}
-              </Button>
-            </Space>
+              </t-button>
+            </div>
           </div>
 
           <div class="flex-1 overflow-y-auto p-6 space-y-6">
-            <Card 
+            <t-card 
               :title="t('settings.connectionSettings')" 
-              :bordered="false" 
-              shadow="never" 
-              class="border rounded-lg" 
-              :class="isDark ? 'bg-zinc-900/50 border-zinc-700' : 'bg-gray-50 border-gray-200'"
+              :bordered="true" 
+              class="rounded-lg bg-bg-card" 
             >
               <div class="grid gap-6 max-w-2xl">
                 <div class="space-y-2">
                   <label class="text-sm font-medium">{{ t('settings.providerType') }}</label>
-                  <Input 
-                    :model-value="selectedProvider.type"
+                  <t-input 
+                    :value="selectedProvider.type"
                     disabled
                     class="w-full"
                   />
-                  <TypographyText type="secondary" size="small">
+                  <span class="text-xs text-text-secondary">
                     {{ t('settings.providerTypeDesc') }}
-                  </TypographyText>
+                  </span>
                 </div>
 
                 <div class="space-y-2">
                   <label class="text-sm font-medium">{{ t('mcp.baseUrl') }}</label>
-                  <Input 
+                  <t-input 
                     v-model="selectedProvider.base_url"
                     placeholder="https://api..."
-                    showClear
+                    clearable
                     class="w-full"
                   />
-                  <TypographyText type="secondary" size="small">
+                  <span class="text-xs text-text-secondary">
                     {{ t('settings.preview', { url: selectedProvider.base_url || '-' }) }}
-                  </TypographyText>
+                  </span>
                 </div>
 
                 <div class="space-y-2">
                   <label class="text-sm font-medium">{{ t('mcp.apiKey') }}</label>
-                  <Input 
+                  <t-input 
                     v-model="selectedProvider.api_key"
-                    mode="password"
+                    type="password"
                     :placeholder="t('mcp.apiKeyPlaceholder')"
-                    showClear
+                    clearable
                     class="w-full"
                   />
-                  <TypographyText type="secondary" size="small">
+                  <span class="text-xs text-text-secondary">
                     {{ t('settings.apiKeyDesc') }}
-                  </TypographyText>
+                  </span>
                 </div>
 
                 <div class="pt-2 flex gap-2">
-                  <Button 
-                    :icon="IconRefresh" 
+                  <t-button 
+                    variant="outline"
                     :loading="modelListLoading"
                     :disabled="saving"
                     @click="fetchRemoteModels"
                   >
+                    <template #icon><RefreshIcon /></template>
                     {{ t('settings.modelList.fetchBtn') }}
-                  </Button>
+                  </t-button>
                 </div>
               </div>
-            </Card>
+            </t-card>
 
             <div class="space-y-4">
               <div class="flex items-center justify-between">
-                <TypographyTitle :heading="5">{{ t('settings.models') }}</TypographyTitle>
-                <Button 
-                  :icon="IconPlus" 
+                <h5 class="text-base font-bold">{{ t('settings.models') }}</h5>
+                <t-button 
+                  variant="text"
                   @click="addModel"
                   :disabled="!selectedProvider.id"
                 >
+                  <template #icon><AddIcon /></template>
                   {{ t('settings.addModel') }}
-                </Button>
+                </t-button>
               </div>
 
-              <Table 
+              <t-table 
                 :columns="columns" 
-                :dataSource="selectedProvider.models || []" 
-                :pagination="false"
+                :data="selectedProvider.models || []" 
+                :pagination="null"
                 size="small"
-                class="border rounded-lg overflow-hidden"
-                :class="isDark ? 'border-zinc-700' : 'border-gray-200'"
+                row-key="id"
+                class="border border-border rounded-lg overflow-hidden"
               >
                 <template #empty>
-                  <Empty 
-                    :description="t('settings.noModels')"
-                    class="py-8"
-                  />
+                  <div class="p-8 text-center text-text-muted">
+                    {{ t('settings.noModels') }}
+                  </div>
                 </template>
 
-                <template #name="{ record }">
-                  <Input 
-                    v-model="record.name" 
+                <template #name="{ row }">
+                  <t-input 
+                    v-model="row.name" 
                     :placeholder="t('settings.displayNamePlaceholder')" 
                     size="small"
-                    variant="plain"
-                    @blur="saveModel(record)"
+                    borderless
+                    @blur="saveModel(row)"
                   />
                 </template>
 
-                <template #model_id="{ record }">
-                  <Input 
-                    v-model="record.model_id" 
+                <template #model_id="{ row }">
+                  <t-input 
+                    v-model="row.model_id" 
                     :placeholder="t('settings.modelIdPlaceholder')" 
                     size="small"
-                    variant="plain"
-                    @blur="saveModel(record)"
+                    borderless
+                    @blur="saveModel(row)"
                   />
                 </template>
 
-                <template #actions="{ record }">
-                  <Button 
-                    type="danger" 
-                    theme="borderless" 
-                    :icon="IconDelete" 
+                <template #actions="{ row }">
+                  <t-button 
+                    theme="danger" 
+                    variant="text" 
+                    shape="square"
                     size="small"
-                    @click="removeModel(record)"
-                  />
+                    @click="removeModel(row)"
+                  >
+                    <template #icon><DeleteIcon /></template>
+                  </t-button>
                 </template>
-              </Table>
+              </t-table>
             </div>
           </div>
         </div>
         
-        <div v-else class="h-full flex items-center justify-center">
-          <Empty 
-            :description="t('settings.selectProvider')"
-            class="text-gray-400"
-          />
+        <div v-else class="h-full flex items-center justify-center text-text-muted">
+          {{ t('settings.selectProvider') }}
         </div>
-      </LayoutContent>
+      </t-content>
 
-      <Modal
-        :visible="modelListVisible"
-        :title="t('settings.modelList.modalTitle')"
-        :footer="null"
+      <t-dialog
+        v-model:visible="modelListVisible"
+        :header="t('settings.modelList.modalTitle')"
+        :footer="false"
         width="600px"
       >
         <div class="space-y-4">
-          <div v-if="availableModels.length === 0" class="text-center py-8 text-gray-500">
+          <div v-if="availableModels.length === 0" class="text-center py-8 text-text-muted">
             {{ t('settings.modelList.noModelsFound') }}
           </div>
 
           <div
             v-for="model in availableModels"
             :key="model.id"
-            class="py-3 border-b last:border-b-0"
-            :class="isDark ? 'border-zinc-700' : 'border-gray-100'"
+            class="py-3 border-b border-border last:border-b-0"
           >
             <div class="flex items-center justify-between gap-4">
               <div class="flex flex-col min-w-0">
-                <span class="font-medium truncate">{{ model.name || model.id }}</span>
-                <TypographyText v-if="model.owned_by" type="secondary" size="small" class="truncate">
+                <span class="font-medium truncate text-text-primary">{{ model.name || model.id }}</span>
+                <span v-if="model.owned_by" class="text-xs text-text-secondary truncate">
                   {{ model.owned_by }}
-                </TypographyText>
+                </span>
               </div>
               <div class="flex items-center gap-2">
-                <Tag v-if="isModelAdded(model.id)" color="green" size="small">ON</Tag>
-                <Button
+                <t-tag v-if="isModelAdded(model.id)" theme="success" size="small">ON</t-tag>
+                <t-button
                   v-if="isModelAdded(model.id)"
-                  type="danger"
-                  theme="borderless"
-                  :icon="IconDelete"
+                  theme="danger"
+                  variant="text"
+                  shape="square"
                   size="small"
                   :disabled="saving"
                   @click="removeRemoteModel(model.id)"
-                />
-                <Button
+                >
+                  <template #icon><DeleteIcon /></template>
+                </t-button>
+                <t-button
                   v-else
-                  theme="borderless"
-                  :icon="IconPlus"
+                  variant="text"
+                  shape="square"
                   size="small"
                   :disabled="saving"
                   @click="addRemoteModel(model)"
-                />
+                >
+                  <template #icon><AddIcon /></template>
+                </t-button>
               </div>
             </div>
           </div>
 
-          <div class="flex justify-end gap-2 pt-4 border-t" :class="isDark ? 'border-zinc-700' : 'border-gray-200'">
-            <Button @click="modelListVisible = false">{{ t('common.cancel') }}</Button>
+          <div class="flex justify-end gap-2 pt-4 border-t border-border">
+            <t-button variant="outline" @click="modelListVisible = false">{{ t('common.cancel') }}</t-button>
           </div>
         </div>
-      </Modal>
-    </Layout>
+      </t-dialog>
+    </t-layout>
   </div>
 </template>
 
 <style scoped>
-:deep(.semi-layout),
-:deep(.semi-layout-sider),
-:deep(.semi-layout-content) {
-  background-color: transparent;
-}
-
-:deep(.semi-input-wrapper) {
-  background-color: var(--semi-color-fill-0);
-}
-
-:deep(.semi-list-item) {
-  padding: 0;
-}
-
-:deep(.semi-layout-sider) {
-  display: flex;
-  flex-direction: column;
-}
-
 .provider-list {
   flex: 1;
-  overflow-y: auto;
-}
-
-:deep(.semi-list) {
-  height: 100%;
-}
-
-:deep(.semi-list-content) {
-  height: 100%;
   overflow-y: auto;
 }
 </style>

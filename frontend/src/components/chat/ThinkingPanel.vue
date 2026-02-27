@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { ChevronDown, ChevronRight, Loader2 } from 'lucide-vue-next'
+import { ChevronDownIcon, ChevronRightIcon, LoadingIcon, CheckIcon } from 'tdesign-icons-vue-next'
 
 const props = defineProps<{
   thinking: string
@@ -11,35 +11,35 @@ const isExpanded = ref(false)
 </script>
 
 <template>
-  <div class="border rounded-lg bg-card mb-4 overflow-hidden">
+  <div class="border border-border rounded-lg bg-bg-card mb-4 overflow-hidden">
     <div 
       @click="isExpanded = !isExpanded"
-      class="flex items-center gap-2 p-3 bg-zinc-50 dark:bg-zinc-900 cursor-pointer text-sm font-medium"
+      class="flex items-center gap-2 p-3 bg-bg-secondary cursor-pointer text-sm font-medium hover:bg-bg-hover transition-colors"
     >
-      <component :is="isExpanded ? ChevronDown : ChevronRight" class="w-4 h-4" />
+      <component :is="isExpanded ? ChevronDownIcon : ChevronRightIcon" />
       <span>Thinking Process</span>
-      <span v-if="tasks.length > 0" class="ml-auto text-xs text-muted-foreground">
+      <span v-if="tasks.length > 0" class="ml-auto text-xs text-text-secondary">
         {{ tasks.filter(t => t.status === 'completed').length }}/{{ tasks.length }} tasks
       </span>
     </div>
 
-    <div v-if="isExpanded" class="p-4 border-t border-border bg-background text-sm space-y-4">
+    <div v-if="isExpanded" class="p-4 border-t border-border bg-bg-primary text-sm space-y-4">
       <!-- Tasks List -->
       <div v-if="tasks.length > 0" class="space-y-2">
-        <h4 class="font-semibold text-xs uppercase text-muted-foreground">Plan</h4>
+        <h4 class="font-semibold text-xs uppercase text-text-muted">Plan</h4>
         <div v-for="(task, index) in tasks" :key="index" class="flex items-center gap-2">
           <div 
             class="w-4 h-4 rounded-full flex items-center justify-center border"
             :class="{
-              'bg-green-500 border-green-500': task.status === 'completed',
-              'bg-yellow-500 border-yellow-500': task.status === 'running',
-              'border-zinc-300': task.status === 'pending'
+              'bg-success border-success': task.status === 'completed',
+              'bg-warning border-warning': task.status === 'running',
+              'border-border': task.status === 'pending'
             }"
           >
-            <Loader2 v-if="task.status === 'running'" class="w-3 h-3 animate-spin text-white" />
-            <span v-else-if="task.status === 'completed'" class="text-white text-xs">✓</span>
+            <LoadingIcon v-if="task.status === 'running'" class="w-3 h-3 animate-spin text-white" />
+            <CheckIcon v-else-if="task.status === 'completed'" class="text-white text-xs" />
           </div>
-          <span :class="{'text-muted-foreground': task.status === 'pending'}">
+          <span :class="{'text-text-muted': task.status === 'pending', 'text-text-primary': task.status !== 'pending'}">
             {{ task.description || task.name }}
           </span>
         </div>
@@ -47,9 +47,10 @@ const isExpanded = ref(false)
 
       <!-- Thinking Log -->
       <div v-if="thinking">
-        <h4 class="font-semibold text-xs uppercase text-muted-foreground mb-1">Log</h4>
-        <p class="font-mono text-xs text-zinc-600 dark:text-zinc-400 whitespace-pre-wrap">{{ thinking }}</p>
+        <h4 class="font-semibold text-xs uppercase text-text-muted mb-1">Log</h4>
+        <p class="font-mono text-xs text-text-secondary whitespace-pre-wrap">{{ thinking }}</p>
       </div>
     </div>
   </div>
 </template>
+

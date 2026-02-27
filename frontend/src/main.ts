@@ -3,7 +3,8 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import i18n from './i18n'
-import '@kousum/semi-ui-vue/dist/_base/base.css'
+import TDesign from 'tdesign-vue-next'
+import 'tdesign-vue-next/es/style/index.css'
 import './style.css'
 
 const app = createApp(App)
@@ -11,5 +12,6 @@ const app = createApp(App)
 app.use(createPinia())
 app.use(router)
 app.use(i18n)
+app.use(TDesign)
 
 app.mount('#app')

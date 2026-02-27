@@ -2,19 +2,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { http } from '../../services/http'
 import { useAuthStore } from '../../store/auth'
-import {
-  Table,
-  Button,
-  Modal,
-  Input,
-  Switch,
-  Typography,
-  Select,
-  Toast
-} from '@kousum/semi-ui-vue'
-import type { ColumnProps } from '@kousum/semi-ui-vue/dist/table/interface'
+import { MessagePlugin } from 'tdesign-vue-next'
 
-const { Title, Text } = Typography
 const auth = useAuthStore()
 
 interface UserRow {
@@ -48,6 +37,11 @@ const passwordNew = ref('')
 const passwordConfirm = ref('')
 const passwordOld = ref('')
 
+const typeOptions = [
+  { label: 'User', value: 'user' },
+  { label: 'Admin', value: 'admin' }
+]
+
 // Load all users for admin management table
 const fetchUsers = async () => {
   loading.value = true
@@ -56,7 +50,7 @@ const fetchUsers = async () => {
     users.value = res.data
   } catch (e) {
     console.error('Failed to fetch users', e)
-    Toast.error('Failed to load users')
+    MessagePlugin.error('Failed to load users')
   } finally {
     loading.value = false
   }
@@ -87,11 +81,11 @@ const saveEdit = async () => {
     if (idx >= 0) {
       users.value[idx] = res.data
     }
-    Toast.success('User updated')
+    MessagePlugin.success('User updated')
     showEditModal.value = false
   } catch (e) {
     console.error('Failed to update user', e)
-    Toast.error('Failed to update user')
+    MessagePlugin.error('Failed to update user')
   }
 }
 
@@ -112,11 +106,11 @@ const createUser = async () => {
   const confirm = newPasswordConfirm.value
 
   if (!username || !password || !confirm) {
-    Toast.warning('Username and passwords are required')
+    MessagePlugin.warning('Username and passwords are required')
     return
   }
   if (password !== confirm) {
-    Toast.warning('Passwords do not match')
+    MessagePlugin.warning('Passwords do not match')
     return
   }
   try {
@@ -126,12 +120,12 @@ const createUser = async () => {
       description: newDescription.value,
       type: newType.value
     })
-    Toast.success('User created')
+    MessagePlugin.success('User created')
     showAddModal.value = false
     await fetchUsers()
   } catch (e) {
     console.error('Failed to create user', e)
-    Toast.error('Failed to create user')
+    MessagePlugin.error('Failed to create user')
   }
 }
 
@@ -148,11 +142,11 @@ const openChangePassword = (user: UserRow) => {
 const changePassword = async () => {
   if (!passwordUser.value) return
   if (!passwordNew.value || !passwordConfirm.value) {
-    Toast.warning('New password and confirmation are required')
+    MessagePlugin.warning('New password and confirmation are required')
     return
   }
   if (passwordNew.value !== passwordConfirm.value) {
-    Toast.warning('Passwords do not match')
+    MessagePlugin.warning('Passwords do not match')
     return
   }
   try {
@@ -161,39 +155,38 @@ const changePassword = async () => {
       new_password_confirm: passwordConfirm.value,
       old_password: passwordOld.value || undefined
     })
-    Toast.success('Password updated')
+    MessagePlugin.success('Password updated')
     showPasswordModal.value = false
   } catch (e) {
     console.error('Failed to change password', e)
-    Toast.error('Failed to change password')
+    MessagePlugin.error('Failed to change password')
   }
 }
 
-const columns = computed<ColumnProps<UserRow>[]>(() => {
-  const cols: ColumnProps<UserRow>[] = [
-    { title: 'Username', dataIndex: 'username', key: 'username' },
+const columns = computed(() => {
+  const cols = [
+    { title: 'Username', colKey: 'username' },
     {
       title: 'Role',
-      dataIndex: 'is_admin',
-      key: 'role',
-      render: (_text, record) => (record.is_admin ? 'Admin' : 'User')
+      colKey: 'role',
+      cell: (h: any, { row }: any) => row.is_admin ? 'Admin' : 'User'
     },
-    { title: 'Description', dataIndex: 'description', key: 'description' }
+    { title: 'Description', colKey: 'description' }
   ]
 
   if (auth.isAdmin) {
     cols.push({
       title: 'Enabled',
-      dataIndex: 'enabled',
-      key: 'enabled',
-      render: (_text, record) => record.enabled ? 'Yes' : 'No'
+      colKey: 'enabled',
+      cell: (h: any, { row }: any) => row.enabled ? 'Yes' : 'No'
     })
   }
 
   cols.push({
     title: 'Actions',
-    key: 'actions',
-    render: (_text, record) => null
+    colKey: 'actions',
+    width: 200,
+    fixed: 'right'
   })
 
   return cols
@@ -205,139 +198,124 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-4 h-full p-4">
     <div class="flex items-center justify-between mb-2">
       <div>
-        <Title :heading="5">User Management</Title>
-        <Text type="secondary" class="text-sm">
+        <h3 class="text-lg font-bold">User Management</h3>
+        <p class="text-sm text-text-secondary">
           Manage users and their roles.
-        </Text>
+        </p>
       </div>
-      <Button v-if="auth.isAdmin" type="primary" theme="solid" @click="openAdd">
+      <t-button v-if="auth.isAdmin" theme="primary" @click="openAdd">
         Add User
-      </Button>
+      </t-button>
     </div>
 
-    <Table
+    <t-table
       :columns="columns"
-      :dataSource="users"
-      rowKey="id"
+      :data="users"
+      row-key="id"
       :loading="loading"
-      :pagination="false"
+      :pagination="null"
+      class="border border-border rounded-lg"
     >
-      <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'actions'">
-          <div class="flex gap-2 justify-end">
-            <Button size="small" theme="borderless" @click="openEdit(record)">
-              Edit
-            </Button>
-            <Button size="small" theme="borderless" @click="openChangePassword(record)">
-              Change Password
-            </Button>
-          </div>
-        </template>
-        <template v-else-if="column.key === 'enabled'">
-          <Switch
-            v-if="auth.isAdmin"
-            :checked="record.enabled"
-            disabled
-          />
-        </template>
-        <template v-else>
-          {{ (record as any)[column.dataIndex as string] }}
-        </template>
+      <template #enabled="{ row }">
+        <t-switch
+          v-if="auth.isAdmin"
+          :value="row.enabled"
+          disabled
+        />
       </template>
-    </Table>
+      <template #actions="{ row }">
+        <div class="flex gap-2 justify-end">
+          <t-button size="small" variant="text" @click="openEdit(row)">
+            Edit
+          </t-button>
+          <t-button size="small" variant="text" @click="openChangePassword(row)">
+            Change Password
+          </t-button>
+        </div>
+      </template>
+    </t-table>
 
     <!-- Edit User Modal -->
-    <Modal
-      :visible="showEditModal"
-      title="Edit User"
-      :okText="'Save'"
-      @ok="saveEdit"
+    <t-dialog
+      v-model:visible="showEditModal"
+      header="Edit User"
+      confirm-btn="Save"
+      @confirm="saveEdit"
       @cancel="showEditModal = false"
     >
       <div class="space-y-3">
         <div v-if="auth.isAdmin">
           <label class="block text-sm font-medium mb-1">Username</label>
-          <Input :value="editUsername" @change="val => (editUsername = val)" />
+          <t-input v-model="editUsername" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Description</label>
-          <Input :value="editDescription" @change="val => (editDescription = val)" />
+          <t-input v-model="editDescription" />
         </div>
         <div v-if="auth.isAdmin">
           <label class="block text-sm font-medium mb-1">Enabled</label>
-          <Switch v-model:checked="editEnabled" />
+          <t-switch v-model="editEnabled" />
         </div>
       </div>
-    </Modal>
+    </t-dialog>
 
     <!-- Add User Modal -->
-    <Modal
-      :visible="showAddModal"
-      title="Add User"
-      :okText="'Create'"
-      @ok="createUser"
+    <t-dialog
+      v-model:visible="showAddModal"
+      header="Add User"
+      confirm-btn="Create"
+      @confirm="createUser"
       @cancel="showAddModal = false"
     >
       <div class="space-y-3">
         <div>
           <label class="block text-sm font-medium mb-1">Type</label>
-          <Select v-model="newType" style="width: 100%">
-            <Select.Option value="user">User</Select.Option>
-            <Select.Option value="admin">Admin</Select.Option>
-          </Select>
+          <t-select v-model="newType" :options="typeOptions" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Username</label>
-          <Input :value="newUsername" @change="val => (newUsername = val)" />
+          <t-input v-model="newUsername" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Password</label>
-          <Input :value="newPassword" type="password" @change="val => (newPassword = val)" />
+          <t-input v-model="newPassword" type="password" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Confirm Password</label>
-          <Input
-            :value="newPasswordConfirm"
-            type="password"
-            @change="val => (newPasswordConfirm = val)"
-          />
+          <t-input v-model="newPasswordConfirm" type="password" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Description</label>
-          <Input :value="newDescription" @change="val => (newDescription = val)" />
+          <t-input v-model="newDescription" />
         </div>
       </div>
-    </Modal>
+    </t-dialog>
 
     <!-- Change Password Modal -->
-    <Modal
-      :visible="showPasswordModal"
-      title="Change Password"
-      :okText="'Update'"
-      @ok="changePassword"
+    <t-dialog
+      v-model:visible="showPasswordModal"
+      header="Change Password"
+      confirm-btn="Update"
+      @confirm="changePassword"
       @cancel="showPasswordModal = false"
     >
       <div class="space-y-3">
         <div>
           <label class="block text-sm font-medium mb-1">Old Password (for self)</label>
-          <Input :value="passwordOld" type="password" @change="val => (passwordOld = val)" />
+          <t-input v-model="passwordOld" type="password" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">New Password</label>
-          <Input :value="passwordNew" type="password" @change="val => (passwordNew = val)" />
+          <t-input v-model="passwordNew" type="password" />
         </div>
         <div>
           <label class="block text-sm font-medium mb-1">Confirm New Password</label>
-          <Input
-            :value="passwordConfirm"
-            type="password"
-            @change="val => (passwordConfirm = val)"
-          />
+          <t-input v-model="passwordConfirm" type="password" />
         </div>
       </div>
-    </Modal>
+    </t-dialog>
   </div>
 </template>
