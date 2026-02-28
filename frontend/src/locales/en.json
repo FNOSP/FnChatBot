@@ -44,7 +44,22 @@
     "statusFailed": "Failed",
     "statusDisabled": "Disabled",
     "statusUnknown": "Unknown",
-    "checking": "Checking..."
+    "checking": "Checking...",
+    "env": "Environment Variables",
+    "envAdd": "Add",
+    "envKey": "KEY",
+    "envValue": "VALUE",
+    "restart": "Restart",
+    "logs": "Logs",
+    "noLogs": "No logs available",
+    "configureManually": "Configure Manually",
+    "rawConfig": "Raw Config (JSON)",
+    "jsonInstruction": "Please copy the configuration JSON from the MCP server's introduction page (preferably use NPX or UVX configuration) and paste it into the input field.",
+    "jsonPlaceholder": "Paste mcpServers JSON here...",
+    "jsonParseError": "Invalid JSON or missing mcpServers. Please check the format.",
+    "deleteConfirmTitle": "Delete MCP Server",
+    "restarting": "Restarting...",
+    "configRiskWarning": "Please confirm the source and identify risks before configuration."
   },
   "skills": {
     "title": "Skill Management",

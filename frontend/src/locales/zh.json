@@ -44,7 +44,22 @@
     "statusFailed": "失败",
     "statusDisabled": "已禁用",
     "statusUnknown": "未知",
-    "checking": "检查中..."
+    "checking": "检查中...",
+    "env": "环境变量",
+    "envAdd": "添加",
+    "envKey": "KEY",
+    "envValue": "VALUE",
+    "restart": "重启",
+    "logs": "日志",
+    "noLogs": "暂无日志",
+    "configureManually": "手动配置",
+    "rawConfig": "原始配置 (JSON)",
+    "jsonInstruction": "请从 MCP 服务器的介绍页面复制配置 JSON（建议使用 NPX 或 UVX 配置）并粘贴到输入框中。",
+    "jsonPlaceholder": "在此粘贴 mcpServers JSON...",
+    "jsonParseError": "JSON 无效或缺少 mcpServers，请检查格式。",
+    "deleteConfirmTitle": "删除 MCP 服务器",
+    "restarting": "重启中...",
+    "configRiskWarning": "请确认来源并识别风险后再配置。"
   },
   "skills": {
     "title": "技能管理",

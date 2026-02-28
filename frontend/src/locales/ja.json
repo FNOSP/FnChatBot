@@ -38,7 +38,22 @@
     "statusFailed": "失敗",
     "statusDisabled": "無効",
     "statusUnknown": "不明",
-    "checking": "確認中..."
+    "checking": "確認中...",
+    "env": "環境変数",
+    "envAdd": "追加",
+    "envKey": "KEY",
+    "envValue": "VALUE",
+    "restart": "再起動",
+    "logs": "ログ",
+    "noLogs": "ログはありません",
+    "configureManually": "手動で設定",
+    "rawConfig": "生の設定 (JSON)",
+    "jsonInstruction": "MCP サーバーの紹介ページから設定 JSON をコピーし（NPX または UVX 設定を推奨）、入力欄に貼り付けてください。",
+    "jsonPlaceholder": "mcpServers JSON をここに貼り付け...",
+    "jsonParseError": "無効な JSON または mcpServers がありません。形式を確認してください。",
+    "deleteConfirmTitle": "MCP サーバーを削除",
+    "restarting": "再起動中...",
+    "configRiskWarning": "設定前にソースを確認し、リスクを把握してください。"
   },
   "skills": {
     "title": "スキル管理",
