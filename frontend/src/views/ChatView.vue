@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { SendIcon, MoonIcon, SunnyIcon, EnterIcon, CloseIcon } from 'tdesign-icons-vue-next'
+import { SendIcon, MoonIcon, SunnyIcon } from 'tdesign-icons-vue-next'
 import MessageItem from '../components/chat/MessageItem.vue'
 import TaskPanel from '../components/chat/TaskPanel.vue'
 import { useChatStore } from '../store/chat'
@@ -13,7 +13,7 @@ const { t } = useI18n()
 const { toggleTheme, isDark } = useTheme()
 const route = useRoute()
 const chatStore = useChatStore()
-const { messages, isThinking, models, currentModelId, currentModel } = storeToRefs(chatStore)
+const { messages, isThinking, models, currentModelId } = storeToRefs(chatStore)
 
 const conversationId = ref(route.params.id as string || 'default')
 const inputValue = ref('')
@@ -33,18 +33,16 @@ interface AttachmentItem {
 
 // Attachment list shown in the chat sender
 const filesList = ref<AttachmentItem[]>([])
-// Whether to show the reference header above the sender
-const showReferenceHeader = ref(true)
 // Tooltip visibility for model select
 const allowToolTip = ref(false)
 
-// Map model list into select options for the dropdown
+// Map model list into select options; prepend "默认模型" so there is always a visible default
 const modelOptions = computed(() => {
-  return models.value.map(m => ({
+  const list = models.value.map(m => ({
     value: m.id,
     label: m.name || m.model,
-    disabled: false,
   }))
+  return [{ value: null, label: '默认模型' }, ...list]
 })
 
 // Keep the message list scrolled to the latest content
@@ -73,14 +71,9 @@ const handleSend = () => {
   inputValue.value = ''
 }
 
-// Change the current chat model
-const handleModelChange = (value: number) => {
+// Change the current chat model (null = default model)
+const handleModelChange = (value: number | null) => {
   chatStore.setCurrentModel(value)
-}
-
-// Handle closing the reference header above the sender
-const onRemoveRef = () => {
-  showReferenceHeader.value = false
 }
 
 // Handle new file selection and simulate upload progress
@@ -138,9 +131,6 @@ const handleFileClick = (e: CustomEvent<AttachmentItem>) => {
             FnChatBot
           </span>
         </div>
-        <t-tag size="small" shape="round" theme="primary" variant="light-outline">
-          {{ currentModel?.name || currentModel?.model || t('chat.currentModel') }}
-        </t-tag>
       </div>
 
       <div class="flex items-center gap-4">
@@ -218,7 +208,7 @@ const handleFileClick = (e: CustomEvent<AttachmentItem>) => {
               <template #suffix="{ renderPresets }">
                 <component :is="renderPresets([{ name: 'uploadImage' }, { name: 'uploadAttachment' }])" />
               </template>
-              <template #footer-prefix>
+              <template #prefix>
                 <div class="model-select">
                   <t-tooltip
                     v-model:visible="allowToolTip"
@@ -230,53 +220,9 @@ const handleFileClick = (e: CustomEvent<AttachmentItem>) => {
                       :options="modelOptions"
                       @change="handleModelChange"
                       @focus="allowToolTip = false"
-                      :placeholder="t('chat.selectModel')"
-                      size="small"
-                      style="min-width: 220px;"
+                      :placeholder="t('chat.selectModel') || '默认模型'"
                     />
                   </t-tooltip>
-                  <div class="sender-helper">
-                    <div class="sender-helper-main">
-                      <EnterIcon
-                        :size="'18px'"
-                        :style="{ color: 'var(--td-text-color-disabled)', transform: 'scaleX(-1)', padding: '2px' }"
-                      />
-                      <span>
-                        {{ t('chat.helper') || 'Press Enter to send, Shift+Enter for new line.' }}
-                      </span>
-                    </div>
-                    <span class="sender-helper-sub">
-                      FnChatBot can make mistakes. Consider checking important information.
-                    </span>
-                  </div>
-                </div>
-              </template>
-              <template v-if="showReferenceHeader" #inner-header>
-                <div
-                  :style="{
-                    display: 'flex',
-                    width: '100%',
-                    marginBottom: '8px',
-                    paddingBottom: '8px',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    borderBottom: '1px solid var(--td-component-stroke)',
-                  }"
-                >
-                  <div :style="{ flex: 1, display: 'flex', alignItems: 'center' }">
-                    <EnterIcon
-                      :size="'20px'"
-                      :style="{ color: 'var(--td-text-color-disabled)', transform: 'scaleX(-1)', padding: '6px' }"
-                    />
-                    <p :style="{ fontSize: '14px', color: 'var(--td-text-color-placeholder)', marginLeft: '4px' }">
-                      “牛顿第一定律（惯性定律）仅适用于惯性参考系，而不适用于非惯性参考系。”
-                    </p>
-                  </div>
-                  <CloseIcon
-                    :size="'20px'"
-                    :style="{ color: 'var(--td-text-color-disabled)', padding: '6px', cursor: 'pointer' }"
-                    @click="onRemoveRef"
-                  />
                 </div>
               </template>
             </t-chat-sender>
@@ -298,30 +244,22 @@ const handleFileClick = (e: CustomEvent<AttachmentItem>) => {
 <style scoped>
 .chat-sender .model-select {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
 }
 
-.chat-sender .sender-helper {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 2px;
-  font-size: 12px;
-  color: var(--td-text-color-placeholder);
+.chat-sender :deep(.model-select .t-select) {
+  width: 140px;
+  height: var(--td-comp-size-m);
+  margin-right: var(--td-comp-margin-s);
 }
 
-.chat-sender .sender-helper-main {
-  display: flex;
-  align-items: center;
-  gap: 4px;
+.chat-sender :deep(.model-select .t-select .t-input) {
+  border-radius: 32px;
+  padding: 0 15px;
 }
 
-.chat-sender .sender-helper-sub {
-  font-size: 11px;
-  opacity: 0.8;
+.chat-sender :deep(.model-select .t-select .t-input.t-is-focused) {
+  box-shadow: none;
 }
 </style>
 
