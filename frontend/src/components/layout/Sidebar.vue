@@ -3,17 +3,21 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChatIcon, SettingIcon, AddIcon } from 'tdesign-icons-vue-next'
 import { useAuthStore } from '../../store/auth'
+import { useTheme } from '../../composables/useTheme'
 import { computed } from 'vue'
 
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const auth = useAuthStore()
+const { isDark } = useTheme()
+
+// Bind TDesign menu theme to the actual app theme so text colors are correct
+const menuTheme = computed(() => isDark.value ? 'dark' : 'light')
 
 const activeValue = computed(() => {
-  // Map current route to left menu active key
+  // Map current route to left menu active key (settings is nav-only, not menu selection)
   if (route.path.startsWith('/chat')) return 'chat'
-  if (route.path.startsWith('/settings')) return 'settings'
   return ''
 })
 
@@ -36,7 +40,7 @@ const handleNewChat = () => {
   >
     <t-menu
       :value="activeValue"
-      theme="dark"
+      :theme="menuTheme"
       class="h-full !border-0 !bg-transparent flex-1 flex flex-col"
     >
       <template #logo>
@@ -56,7 +60,7 @@ const handleNewChat = () => {
       <t-menu-item
         value="new-chat"
         @click="handleNewChat"
-        class="mx-3 mt-4 mb-1 rounded-lg bg-brand text-text-inverse hover:bg-brand-light transition-colors"
+        class="sidebar-nav-btn mx-3 mt-4 mb-1 rounded-lg"
       >
         <template #icon>
           <AddIcon />
@@ -83,7 +87,7 @@ const handleNewChat = () => {
         <t-menu-item
           value="settings"
           @click="navigateTo('/settings')"
-          class="border-t border-border mt-2 pt-3"
+          class="sidebar-nav-btn border-t border-border mt-2 pt-3"
         >
           <template #icon>
             <SettingIcon />
@@ -95,3 +99,12 @@ const handleNewChat = () => {
   </t-aside>
 </template>
 
+<style scoped>
+/* Keep nav buttons transparent; TDesign handles text color via :theme binding */
+:deep(.sidebar-nav-btn) {
+  background: transparent !important;
+}
+:deep(.sidebar-nav-btn:hover) {
+  background: var(--bg-hover) !important;
+}
+</style>

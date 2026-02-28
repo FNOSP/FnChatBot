@@ -380,7 +380,7 @@ onMounted(() => {
         <t-button variant="text" shape="square" :loading="loading" @click="fetchServers">
           <template #icon><RefreshIcon /></template>
         </t-button>
-        <t-button theme="primary" @click="openJsonDialog">
+        <t-button theme="default" variant="outline" @click="openJsonDialog">
           <template #icon><AddIcon /></template>
           {{ t('mcp.addServer') }}
         </t-button>
