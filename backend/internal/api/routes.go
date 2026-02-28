@@ -39,12 +39,14 @@ func RegisterRoutes(r *gin.RouterGroup) {
 	r.PATCH("/skills/:id", ToggleSkill)
 	r.DELETE("/skills/:id", DeleteSkill)
 
-	// MCP
+	// MCP (name-based; config in mcp.json)
 	r.GET("/mcp", GetMCPs)
-	r.GET("/mcp/:id", GetMCP)
+	r.POST("/mcp/check", CheckAllMCPs)
+	r.GET("/mcp/:name", GetMCP)
 	r.POST("/mcp", CreateMCP)
-	r.PUT("/mcp/:id", UpdateMCP)
-	r.DELETE("/mcp/:id", DeleteMCP)
+	r.PUT("/mcp/:name", UpdateMCP)
+	r.DELETE("/mcp/:name", DeleteMCP)
+	r.POST("/mcp/:name/check", CheckMCP)
 
 	// Sandbox
 	r.GET("/sandbox", GetSandboxConfig)

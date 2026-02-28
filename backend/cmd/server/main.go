@@ -10,6 +10,7 @@ import (
 	"fnchatbot/internal/auth"
 	"fnchatbot/internal/config"
 	"fnchatbot/internal/db"
+	"fnchatbot/internal/services"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,20 @@ func main() {
 
 	// Initialize Database
 	db.InitDB("fnchatbot.db")
+
+	// Initialize MCP service (config from mcp.json; path via env FNCHATBOT_MCP_CONFIG if set)
+	mcpConfigPath := os.Getenv("FNCHATBOT_MCP_CONFIG")
+	if mcpConfigPath == "" {
+		mcpConfigPath = "mcp.json"
+	}
+	services.DefaultMCPService = services.NewMCPService(mcpConfigPath)
+
+	// On exit, close all MCP clients (e.g. stdio subprocesses)
+	defer func() {
+		if services.DefaultMCPService != nil {
+			services.DefaultMCPService.Shutdown()
+		}
+	}()
 
 	// Initialize authentication and authorization services.
 	if err := auth.Init(db.DB, appCfg.Auth); err != nil {

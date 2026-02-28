@@ -34,7 +34,17 @@
     "apiKey": "API 密钥 (可选)",
     "namePlaceholder": "我的服务器",
     "urlPlaceholder": "http://localhost:3000/sse",
-    "apiKeyPlaceholder": "..."
+    "apiKeyPlaceholder": "...",
+    "type": "类型",
+    "typeLocal": "本地",
+    "typeRemote": "远程",
+    "command": "命令",
+    "commandPlaceholder": "例如 npx -y @modelcontextprotocol/server-filesystem /tmp",
+    "statusConnected": "已连接",
+    "statusFailed": "失败",
+    "statusDisabled": "已禁用",
+    "statusUnknown": "未知",
+    "checking": "检查中..."
   },
   "skills": {
     "title": "技能管理",

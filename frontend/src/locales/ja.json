@@ -28,7 +28,17 @@
     "apiKey": "API キー (オプション)",
     "namePlaceholder": "マイサーバー",
     "urlPlaceholder": "http://localhost:3000/sse",
-    "apiKeyPlaceholder": "..."
+    "apiKeyPlaceholder": "...",
+    "type": "タイプ",
+    "typeLocal": "ローカル",
+    "typeRemote": "リモート",
+    "command": "コマンド",
+    "commandPlaceholder": "例: npx -y @modelcontextprotocol/server-filesystem /tmp",
+    "statusConnected": "接続済み",
+    "statusFailed": "失敗",
+    "statusDisabled": "無効",
+    "statusUnknown": "不明",
+    "checking": "確認中..."
   },
   "skills": {
     "title": "スキル管理",

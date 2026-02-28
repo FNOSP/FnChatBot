@@ -1,116 +1,213 @@
 package api
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"fnchatbot/internal/auth"
-	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
+	"fnchatbot/internal/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-// GetMCPs returns all MCP configurations
+// GetMCPs returns all MCP configs with runtime status (system-level, no user filter).
 func GetMCPs(c *gin.Context) {
-	user, ok := auth.CurrentUser(c)
-	if !ok {
+	if _, ok := auth.CurrentUser(c); !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-
-	var mcps []models.MCPConfig
-	if err := db.DB.Where("user_id = ?", user.ID).Find(&mcps).Error; err != nil {
+	if services.DefaultMCPService == nil {
+		c.JSON(http.StatusOK, []models.MCPServerInfo{})
+		return
+	}
+	f, err := services.DefaultMCPService.LoadFile()
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, mcps)
+	status := services.DefaultMCPService.GetStatus()
+	list := make([]models.MCPServerInfo, 0, len(f.Servers))
+	for name, cfg := range f.Servers {
+		st := status[name]
+		if st.Status == "" {
+			st = models.MCPStatus{Status: models.MCPStatusUnknown}
+		}
+		list = append(list, models.MCPServerInfo{
+			Name:            name,
+			MCPServerConfig: cfg,
+			MCPStatus:       st,
+		})
+	}
+	c.JSON(http.StatusOK, list)
 }
 
-// GetMCP returns a single MCP configuration
+// GetMCP returns a single MCP config and status by name.
 func GetMCP(c *gin.Context) {
-	user, ok := auth.CurrentUser(c)
-	if !ok {
+	if _, ok := auth.CurrentUser(c); !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-
-	id := c.Param("id")
-	var mcp models.MCPConfig
-	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).First(&mcp).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "MCP config not found"})
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
 		return
 	}
-	c.JSON(http.StatusOK, mcp)
+	if services.DefaultMCPService == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "MCP server not found"})
+		return
+	}
+	cfg, err := services.DefaultMCPService.GetServerConfig(name)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	status := services.DefaultMCPService.GetStatus()
+	st := status[name]
+	if st.Status == "" {
+		st = models.MCPStatus{Status: models.MCPStatusUnknown}
+	}
+	c.JSON(http.StatusOK, models.MCPServerInfo{
+		Name:            name,
+		MCPServerConfig: *cfg,
+		MCPStatus:       st,
+	})
 }
 
-// CreateMCP creates a new MCP configuration
+// CreateMCP creates or overwrites an MCP server in mcp.json. Body: { "name": "...", ... MCPServerConfig } or name in body.
 func CreateMCP(c *gin.Context) {
-	user, ok := auth.CurrentUser(c)
-	if !ok {
+	if _, ok := auth.CurrentUser(c); !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-
-	var mcp models.MCPConfig
-	if err := c.ShouldBindJSON(&mcp); err != nil {
+	if services.DefaultMCPService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "MCP service not initialized"})
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+		models.MCPServerConfig
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	mcp.UserID = user.ID
-
-	if err := db.DB.Create(&mcp).Error; err != nil {
+	name := body.Name
+	if name == "" {
+		name = c.Param("name")
+	}
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
+		return
+	}
+	if err := services.DefaultMCPService.SetServer(name, body.MCPServerConfig); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, mcp)
+	status := services.DefaultMCPService.GetStatus()
+	st := status[name]
+	if st.Status == "" {
+		st = models.MCPStatus{Status: models.MCPStatusUnknown}
+	}
+	c.JSON(http.StatusOK, models.MCPServerInfo{
+		Name:            name,
+		MCPServerConfig: body.MCPServerConfig,
+		MCPStatus:       st,
+	})
 }
 
-// UpdateMCP updates an existing MCP configuration
+// UpdateMCP updates an MCP server by name. Path param "name" identifies the server.
 func UpdateMCP(c *gin.Context) {
-	user, ok := auth.CurrentUser(c)
-	if !ok {
+	if _, ok := auth.CurrentUser(c); !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-
-	id := c.Param("id")
-	var mcp models.MCPConfig
-	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).First(&mcp).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "MCP config not found"})
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
 		return
 	}
-
-	var input models.MCPConfig
-	if err := c.ShouldBindJSON(&input); err != nil {
+	if services.DefaultMCPService == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "MCP service not initialized"})
+		return
+	}
+	var cfg models.MCPServerConfig
+	if err := c.ShouldBindJSON(&cfg); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	// Update fields
-	mcp.Name = input.Name
-	mcp.BaseURL = input.BaseURL
-	mcp.ApiKey = input.ApiKey
-	mcp.Enabled = input.Enabled
-
-	if err := db.DB.Save(&mcp).Error; err != nil {
+	if err := services.DefaultMCPService.SetServer(name, cfg); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, mcp)
+	status := services.DefaultMCPService.GetStatus()
+	st := status[name]
+	if st.Status == "" {
+		st = models.MCPStatus{Status: models.MCPStatusUnknown}
+	}
+	c.JSON(http.StatusOK, models.MCPServerInfo{
+		Name:            name,
+		MCPServerConfig: cfg,
+		MCPStatus:       st,
+	})
 }
 
-// DeleteMCP deletes an MCP configuration
+// DeleteMCP removes an MCP server by name.
 func DeleteMCP(c *gin.Context) {
-	user, ok := auth.CurrentUser(c)
-	if !ok {
+	if _, ok := auth.CurrentUser(c); !ok {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
 		return
 	}
-
-	id := c.Param("id")
-	if err := db.DB.Where("id = ? AND user_id = ?", id, user.ID).Delete(&models.MCPConfig{}).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
+		return
+	}
+	if services.DefaultMCPService == nil {
+		c.JSON(http.StatusOK, gin.H{"message": "MCP deleted"})
+		return
+	}
+	if err := services.DefaultMCPService.DeleteServer(name); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "MCP deleted"})
+}
+
+// CheckAllMCPs runs status check for all enabled MCP servers and returns status map.
+func CheckAllMCPs(c *gin.Context) {
+	if _, ok := auth.CurrentUser(c); !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	if services.DefaultMCPService == nil {
+		c.JSON(http.StatusOK, gin.H{})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
+	defer cancel()
+	status := services.DefaultMCPService.CheckAllEnabled(ctx)
+	c.JSON(http.StatusOK, status)
+}
+
+// CheckMCP runs status check for a single MCP server by name.
+func CheckMCP(c *gin.Context) {
+	if _, ok := auth.CurrentUser(c); !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	name := c.Param("name")
+	if name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name required"})
+		return
+	}
+	if services.DefaultMCPService == nil {
+		c.JSON(http.StatusOK, models.MCPStatus{Status: models.MCPStatusUnknown})
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+	st := services.DefaultMCPService.CheckServer(ctx, name)
+	c.JSON(http.StatusOK, st)
 }

@@ -34,7 +34,17 @@
     "apiKey": "API Key (Optional)",
     "namePlaceholder": "My Server",
     "urlPlaceholder": "http://localhost:3000/sse",
-    "apiKeyPlaceholder": "..."
+    "apiKeyPlaceholder": "...",
+    "type": "Type",
+    "typeLocal": "Local",
+    "typeRemote": "Remote",
+    "command": "Command",
+    "commandPlaceholder": "e.g. npx -y @modelcontextprotocol/server-filesystem /tmp",
+    "statusConnected": "Connected",
+    "statusFailed": "Failed",
+    "statusDisabled": "Disabled",
+    "statusUnknown": "Unknown",
+    "checking": "Checking..."
   },
   "skills": {
     "title": "Skill Management",

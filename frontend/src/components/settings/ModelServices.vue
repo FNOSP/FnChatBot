@@ -367,7 +367,7 @@ onMounted(() => {
   <div class="h-full text-text-primary bg-bg-primary">
     <t-layout class="h-full border border-border rounded-lg overflow-hidden bg-bg-card">
       <t-aside
-        class="border-r border-border flex flex-col bg-bg-secondary"
+        class="border-r border-border flex flex-col min-h-0 bg-bg-secondary"
         width="18rem"
       >
         <div class="p-4 border-b border-border">

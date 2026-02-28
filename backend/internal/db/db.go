@@ -1,7 +1,9 @@
 package db
 
 import (
+	"encoding/json"
 	"log"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -11,6 +13,18 @@ import (
 	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
+
+// legacyMCPConfig is used only for migrating from DB to mcp.json.
+type legacyMCPConfig struct {
+	Name    string `gorm:"column:name"`
+	BaseURL string `gorm:"column:base_url"`
+	ApiKey  string `gorm:"column:api_key"`
+	Enabled bool   `gorm:"column:enabled"`
+}
+
+func (legacyMCPConfig) TableName() string {
+	return "mcp_configs"
+}
 
 var DB *gorm.DB
 
@@ -29,7 +43,7 @@ func InitDB(dbPath string) {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto Migrate the schema
+	// Auto Migrate the schema (MCP config moved to mcp.json, no longer in DB)
 	err = DB.AutoMigrate(
 		&models.User{},
 		&models.Provider{},
@@ -38,7 +52,6 @@ func InitDB(dbPath string) {
 		&models.Session{},
 		&models.Message{},
 		&models.Part{},
-		&models.MCPConfig{},
 		&models.Skill{},
 		&models.AgentTask{},
 		&models.SandboxConfig{},
@@ -51,6 +64,11 @@ func InitDB(dbPath string) {
 	// Seed initial data if needed
 	seedSkills()
 	seedSandboxConfig()
+
+	// Migrate legacy MCP config from DB to mcp.json if that file does not exist
+	if err := MigrateMCPConfigToFile("mcp.json"); err != nil {
+		log.Printf("MCP config migration: %v", err)
+	}
 
 	// 初始化系统预定义供应商
 	if err := config.InitSystemProviders(DB); err != nil {
@@ -177,4 +195,48 @@ func seedSandboxConfig() {
 			log.Println("Seeded initial sandbox config")
 		}
 	}
+}
+
+// MigrateMCPConfigToFile exports legacy mcp_configs rows to mcp.json if the file does not exist.
+func MigrateMCPConfigToFile(mcpFilePath string) error {
+	if mcpFilePath == "" {
+		mcpFilePath = "mcp.json"
+	}
+	if _, err := os.Stat(mcpFilePath); err == nil {
+		return nil // file exists, skip
+	}
+	var rows []legacyMCPConfig
+	if err := DB.Find(&rows).Error; err != nil {
+		// Table might not exist on fresh install
+		return nil
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	servers := make(map[string]models.MCPServerConfig)
+	for _, r := range rows {
+		name := strings.TrimSpace(r.Name)
+		if name == "" {
+			continue
+		}
+		servers[name] = models.MCPServerConfig{
+			Type:    models.MCPTypeRemote,
+			URL:     r.BaseURL,
+			ApiKey:  r.ApiKey,
+			Enabled: r.Enabled,
+			Timeout: 5000,
+		}
+	}
+	if len(servers) == 0 {
+		return nil
+	}
+	data, err := json.MarshalIndent(&models.MCPFile{Servers: servers}, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(mcpFilePath, data, 0644); err != nil {
+		return err
+	}
+	log.Printf("Migrated %d MCP config(s) from DB to %s", len(servers), mcpFilePath)
+	return nil
 }

@@ -1,16 +1,17 @@
 package services
 
 import (
-	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"time"
 
 	"fnchatbot/internal/db"
 	"fnchatbot/internal/models"
+
+	"github.com/mark3labs/mcp-go/client"
+	"github.com/mark3labs/mcp-go/mcp"
 )
 
 const (
@@ -112,18 +113,19 @@ func (s *ToolService) GetAvailableTools() ([]Tool, error) {
 		tools = append(tools, tool)
 	}
 
-	var mcps []models.MCPConfig
-	if err := db.DB.Where("enabled = ? AND user_id = ?", true, s.UserID).Find(&mcps).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch MCPs: %v", err)
-	}
-
-	for _, mcp := range mcps {
-		mcpTools, err := s.fetchMCPTools(mcp)
-		if err != nil {
-			log.Printf("Failed to fetch tools from MCP %s: %v", mcp.Name, err)
-			continue
+	// Collect tools from connected MCP clients (config in mcp.json, no user filter)
+	if DefaultMCPService != nil {
+		clients := DefaultMCPService.GetConnectedClients()
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		for name, c := range clients {
+			mcpTools, err := s.listMCPTools(ctx, name, c)
+			if err != nil {
+				log.Printf("Failed to list tools from MCP %s: %v", name, err)
+				continue
+			}
+			tools = append(tools, mcpTools...)
 		}
-		tools = append(tools, mcpTools...)
 	}
 
 	return tools, nil
@@ -161,28 +163,33 @@ func (s *ToolService) convertSkillToTool(skill models.Skill) (Tool, error) {
 	}, nil
 }
 
-func (s *ToolService) fetchMCPTools(mcp models.MCPConfig) ([]Tool, error) {
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(fmt.Sprintf("%s/tools", mcp.BaseURL))
+// listMCPTools calls MCP ListTools and converts result to our Tool slice.
+func (s *ToolService) listMCPTools(ctx context.Context, serverName string, c *client.Client) ([]Tool, error) {
+	res, err := c.ListTools(ctx, mcp.ListToolsRequest{})
 	if err != nil {
 		return nil, err
 	}
-	// Close response body to avoid resource leaks.
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Failed to close MCP tools response body: %v", err)
+	if res == nil {
+		return nil, nil
+	}
+	out := make([]Tool, 0, len(res.Tools))
+	for _, t := range res.Tools {
+		params := make(map[string]interface{})
+		data, _ := json.Marshal(t.InputSchema)
+		_ = json.Unmarshal(data, &params)
+		if len(params) == 0 {
+			params = map[string]interface{}{"type": "object", "properties": map[string]interface{}{}}
 		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("MCP returned status %d", resp.StatusCode)
+		out = append(out, Tool{
+			Type: ToolTypeFunction,
+			Function: ToolSchema{
+				Name:        t.Name,
+				Description: t.Description,
+				Parameters:  params,
+			},
+		})
 	}
-
-	var tools []Tool
-	if err := json.NewDecoder(resp.Body).Decode(&tools); err != nil {
-		return nil, err
-	}
-	return tools, nil
+	return out, nil
 }
 
 func (s *ToolService) ExecuteSkill(name string, args string) (string, error) {
@@ -235,51 +242,38 @@ Skill loaded successfully. You can now use this knowledge to assist the user.`, 
 		return "2023-10-27 10:00:00", nil
 	}
 
-	var mcps []models.MCPConfig
-	if err := db.DB.Where("enabled = ?", true).Find(&mcps).Error; err != nil {
-		return "", fmt.Errorf("failed to load MCP configs: %v", err)
-	}
-
-	for _, mcp := range mcps {
-		result, err := s.executeMCPTool(mcp, name, args)
-		if err == nil {
-			return result, nil
+	// Execute via MCP client CallTool
+	if DefaultMCPService != nil {
+		clients := DefaultMCPService.GetConnectedClients()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		var argsMap map[string]interface{}
+		if args != "" {
+			_ = json.Unmarshal([]byte(args), &argsMap)
+		}
+		if argsMap == nil {
+			argsMap = make(map[string]interface{})
+		}
+		req := mcp.CallToolRequest{Params: mcp.CallToolParams{Name: name, Arguments: argsMap}}
+		for _, c := range clients {
+			res, err := c.CallTool(ctx, req)
+			if err != nil {
+				continue
+			}
+			return formatCallToolResult(res), nil
 		}
 	}
 
 	return fmt.Sprintf("Tool %s not found or execution failed", name), fmt.Errorf("tool not found")
 }
 
-func (s *ToolService) executeMCPTool(mcp models.MCPConfig, name string, args string) (string, error) {
-	payload := map[string]string{
-		"name": name,
-		"args": args,
+func formatCallToolResult(res *mcp.CallToolResult) string {
+	if res == nil {
+		return ""
 	}
-	jsonBody, err := json.Marshal(payload)
-	if err != nil {
-		return "", fmt.Errorf("failed to build MCP payload: %v", err)
+	var buf string
+	for _, c := range res.Content {
+		buf += mcp.GetTextFromContent(c)
 	}
-
-	client := &http.Client{Timeout: 10 * time.Second}
-	resp, err := client.Post(fmt.Sprintf("%s/tools/execute", mcp.BaseURL), "application/json", bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return "", err
-	}
-	// Close response body to avoid resource leaks.
-	defer func() {
-		if err := resp.Body.Close(); err != nil {
-			log.Printf("Failed to close MCP execute response body: %v", err)
-		}
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("MCP execution failed with status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	return string(body), nil
+	return buf
 }
