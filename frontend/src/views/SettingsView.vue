@@ -23,7 +23,7 @@ const menuItems = computed(() => [
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-bg-card rounded-lg px-6 py-4">
+  <div class="h-full flex flex-col bg-bg-card px-6 py-4">
     <div class="mb-4">
       <h2 class="text-2xl font-bold text-text-primary">{{ t('settings.title') }}</h2>
       <p class="mt-1 text-sm text-text-secondary">

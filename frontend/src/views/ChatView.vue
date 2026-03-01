@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, nextTick, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { SendIcon, MoonIcon, SunnyIcon } from 'tdesign-icons-vue-next'
+import { SendIcon } from 'tdesign-icons-vue-next'
 import MessageItem from '../components/chat/MessageItem.vue'
 import TaskPanel from '../components/chat/TaskPanel.vue'
 import { useChatStore } from '../store/chat'
 import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { useTheme } from '../composables/useTheme'
 
 const { t } = useI18n()
-const { toggleTheme, isDark } = useTheme()
 const route = useRoute()
 const chatStore = useChatStore()
 const { messages, isThinking, models, currentModelId } = storeToRefs(chatStore)
@@ -119,35 +117,7 @@ const handleFileClick = (e: CustomEvent<AttachmentItem>) => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-bg-card rounded-lg">
-    <!-- Chat Header: align with TDesign ChatEngine style -->
-    <header class="h-16 border-b border-border flex items-center justify-between px-6">
-      <div class="flex items-center gap-3">
-        <div class="flex flex-col">
-          <span class="text-sm text-text-secondary uppercase tracking-wide">
-            {{ t('chat.conversation') || 'Conversation' }}
-          </span>
-          <span class="text-lg font-semibold text-text-primary">
-            FnChatBot
-          </span>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-4">
-        <t-button
-          variant="text"
-          shape="square"
-          @click="toggleTheme"
-          aria-label="Toggle theme"
-        >
-          <template #icon>
-            <MoonIcon v-if="isDark" />
-            <SunnyIcon v-else />
-          </template>
-        </t-button>
-      </div>
-    </header>
-
+  <div class="h-full flex flex-col bg-bg-card">
     <!-- Main Content: messages + task sidebar -->
     <main class="flex-1 flex min-h-0 overflow-hidden">
       <section class="flex-1 flex flex-col min-w-0">
