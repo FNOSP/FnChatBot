@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ChatIcon, SettingIcon, AddIcon } from 'tdesign-icons-vue-next'
+import { SettingIcon, AddIcon } from 'tdesign-icons-vue-next'
 import { useAuthStore } from '../../store/auth'
 import { useTheme } from '../../composables/useTheme'
 import { useSettingsDrawer } from '../../composables/useSettingsDrawer'
@@ -38,13 +38,8 @@ const handleNewChat = () => {
       class="h-full !border-0 !bg-transparent flex-1 flex flex-col"
     >
       <template #logo>
-        <div class="px-4 py-4 border-b border-border flex items-center justify-between">
-          <div class="flex flex-col">
-            <span class="text-lg font-semibold text-text-primary">FnChatBot</span>
-            <span class="text-xs text-text-muted mt-0.5">
-              {{ t('sidebar.appSubtitle') || 'AI Coding Assistant' }}
-            </span>
-          </div>
+        <div class="px-4 py-4 flex items-center justify-between">
+          <span class="text-lg font-semibold text-text-primary">FnChatBot</span>
           <span class="px-2 py-0.5 text-[10px] rounded-full bg-brand/10 text-brand uppercase tracking-wide">
             Beta
           </span>
@@ -64,16 +59,9 @@ const handleNewChat = () => {
 
       <div class="flex-1 min-h-0 flex flex-col mt-2">
         <t-menu-group :title="t('sidebar.recentChats')" class="flex-1 min-h-0">
-          <!-- History List Placeholder -->
           <div class="px-3 pb-3 text-xs text-text-muted">
-            {{ t('sidebar.emptyHistory') || 'Your recent chats will appear here.' }}
+            {{ t('sidebar.emptyHistory') }}
           </div>
-          <t-menu-item value="chat-history-1" disabled class="opacity-60">
-            <template #icon>
-              <ChatIcon />
-            </template>
-            {{ t('sidebar.projectPlanning') }}
-          </t-menu-item>
         </t-menu-group>
       </div>
 
@@ -81,7 +69,7 @@ const handleNewChat = () => {
         <t-menu-item
           value="settings"
           @click="toggleSettings"
-          :class="['sidebar-nav-btn border-t border-border mt-2 pt-3', { 'sidebar-nav-active': settingsVisible }]"
+          :class="['sidebar-nav-btn', { 'sidebar-nav-active': settingsVisible }]"
         >
           <template #icon>
             <SettingIcon />
@@ -94,6 +82,12 @@ const handleNewChat = () => {
 </template>
 
 <style scoped>
+/* Override TDesign default menu width (232px) to fill sidebar container */
+:deep(.t-default-menu) {
+  width: 100% !important;
+  display: block !important;
+}
+
 /* Keep nav buttons transparent; TDesign handles text color via :theme binding */
 :deep(.sidebar-nav-btn) {
   background: transparent !important;

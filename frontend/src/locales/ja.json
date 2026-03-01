@@ -15,6 +15,14 @@
     "error": "エラー",
     "required": "必須"
   },
+  "sidebar": {
+    "appSubtitle": "AI コーディングアシスタント",
+    "newChat": "新しいチャット",
+    "search": "検索",
+    "recentChats": "最近のチャット",
+    "emptyHistory": "最近のチャットがここに表示されます。",
+    "projectPlanning": "プロジェクト計画"
+  },
   "mcp": {
     "title": "MCP サーバー",
     "description": "Model Context Protocol (MCP) サーバーを管理して機能を拡張します。",
@@ -151,6 +159,7 @@
     }
   },
   "chat": {
+    "conversation": "会話",
     "placeholder": "メッセージを入力...",
     "send": "送信",
     "selectModel": "モデルを選択",

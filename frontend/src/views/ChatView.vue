@@ -157,7 +157,7 @@ const handleFileClick = (e: CustomEvent<AttachmentItem>) => {
         </div>
 
         <!-- Input Area -->
-        <footer class="border-t border-border px-6 py-3 bg-bg-card/80 backdrop-blur">
+        <footer class="px-6 py-3 bg-bg-card/80 backdrop-blur">
           <div class="max-w-4xl mx-auto">
             <t-chat-sender
               v-model="inputValue"

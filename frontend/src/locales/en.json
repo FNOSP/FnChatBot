@@ -16,9 +16,11 @@
     "required": "Required"
   },
   "sidebar": {
+    "appSubtitle": "AI Coding Assistant",
     "newChat": "New Chat",
     "search": "Search",
     "recentChats": "Recent Chats",
+    "emptyHistory": "Your recent chats will appear here.",
     "projectPlanning": "Project Planning"
   },
   "mcp": {
@@ -173,6 +175,7 @@
     "confirmPassword": "Confirm Password"
   },
   "chat": {
+    "conversation": "Conversation",
     "placeholder": "Type a message...",
     "send": "Send",
     "selectModel": "Select Model",
