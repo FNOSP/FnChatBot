@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ChatView from '../views/ChatView.vue'
 import { useAuthStore } from '../store/auth'
+import { useSettingsDrawer } from '../composables/useSettingsDrawer'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -18,7 +19,11 @@ const router = createRouter({
     {
       path: '/settings',
       name: 'settings',
-      component: () => import('../views/SettingsView.vue')
+      redirect: () => {
+        const { openSettings } = useSettingsDrawer()
+        openSettings()
+        return { name: 'home' }
+      }
     },
     {
       path: '/login',

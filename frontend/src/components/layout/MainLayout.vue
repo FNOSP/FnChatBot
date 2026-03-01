@@ -1,24 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
 import { MoonIcon, SunnyIcon } from 'tdesign-icons-vue-next'
 import { useI18n } from 'vue-i18n'
 import Sidebar from './Sidebar.vue'
+import SettingsView from '../../views/SettingsView.vue'
 import { useTheme } from '../../composables/useTheme'
+import { useSettingsDrawer } from '../../composables/useSettingsDrawer'
 
-const route = useRoute()
 const { t } = useI18n()
 const { toggleTheme, isDark } = useTheme()
+const { settingsVisible, closeSettings } = useSettingsDrawer()
 
-const pageTitle = computed(() => {
-  if (route.path === '/settings') return t('settings.title')
-  return 'FnChatBot'
-})
-
-const pageSubtitle = computed(() => {
-  if (route.path === '/settings') return ''
-  return t('chat.conversation') || 'Conversation'
-})
+const pageTitle = computed(() => 'FnChatBot')
+const pageSubtitle = computed(() => t('chat.conversation') || 'Conversation')
 </script>
 
 <template>
@@ -54,5 +48,18 @@ const pageSubtitle = computed(() => {
         <slot />
       </div>
     </t-layout>
+
+    <t-drawer
+      v-model:visible="settingsVisible"
+      :header="t('settings.title')"
+      placement="right"
+      size="75%"
+      :footer="false"
+      :close-on-overlay-click="true"
+      :show-overlay="true"
+      @close="closeSettings"
+    >
+      <SettingsView />
+    </t-drawer>
   </t-layout>
 </template>

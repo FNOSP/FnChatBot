@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { ChatIcon, SettingIcon, AddIcon } from 'tdesign-icons-vue-next'
 import { useAuthStore } from '../../store/auth'
 import { useTheme } from '../../composables/useTheme'
+import { useSettingsDrawer } from '../../composables/useSettingsDrawer'
 import { computed } from 'vue'
 
 const router = useRouter()
@@ -11,23 +12,16 @@ const route = useRoute()
 const { t } = useI18n()
 const auth = useAuthStore()
 const { isDark } = useTheme()
+const { settingsVisible, toggleSettings } = useSettingsDrawer()
 
-// Bind TDesign menu theme to the actual app theme so text colors are correct
 const menuTheme = computed(() => isDark.value ? 'dark' : 'light')
 
 const activeValue = computed(() => {
-  // Map current route to left menu active key (settings is nav-only, not menu selection)
   if (route.path.startsWith('/chat')) return 'chat'
   return ''
 })
 
-const navigateTo = (path: string) => {
-  // Navigate to target path from sidebar actions
-  router.push(path)
-}
-
 const handleNewChat = () => {
-  // Start a fresh chat session from sidebar entry
   router.push('/')
 }
 </script>
@@ -86,8 +80,8 @@ const handleNewChat = () => {
       <template #operations>
         <t-menu-item
           value="settings"
-          @click="navigateTo('/settings')"
-          class="sidebar-nav-btn border-t border-border mt-2 pt-3"
+          @click="toggleSettings"
+          :class="['sidebar-nav-btn border-t border-border mt-2 pt-3', { 'sidebar-nav-active': settingsVisible }]"
         >
           <template #icon>
             <SettingIcon />
@@ -106,5 +100,9 @@ const handleNewChat = () => {
 }
 :deep(.sidebar-nav-btn:hover) {
   background: var(--bg-hover) !important;
+}
+:deep(.sidebar-nav-active) {
+  background: var(--bg-hover) !important;
+  color: var(--td-brand-color) !important;
 }
 </style>

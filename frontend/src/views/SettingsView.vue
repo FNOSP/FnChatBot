@@ -23,19 +23,12 @@ const menuItems = computed(() => [
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-bg-card px-6 py-4">
-    <div class="mb-4">
-      <h2 class="text-2xl font-bold text-text-primary">{{ t('settings.title') }}</h2>
-      <p class="mt-1 text-sm text-text-secondary">
-        {{ t('settings.subtitle') || 'Configure general preferences, models, sandboxes and user access.' }}
-      </p>
-    </div>
-    
+  <div class="h-full flex flex-col bg-bg-card">
     <t-tabs
       v-model="currentTab"
       placement="left"
       theme="normal"
-      class="flex-1 bg-bg-card rounded-lg shadow-sm border border-border"
+      class="flex-1 settings-tabs"
     >
       <t-tab-panel 
         v-for="item in menuItems" 
@@ -59,3 +52,11 @@ const menuItems = computed(() => [
   </div>
 </template>
 
+<style scoped>
+.settings-tabs {
+  height: 100%;
+}
+:deep(.t-tabs__content) {
+  height: 100%;
+}
+</style>
