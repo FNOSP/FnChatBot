@@ -21,7 +21,22 @@
     "search": "Search",
     "recentChats": "Recent Chats",
     "emptyHistory": "Your recent chats will appear here.",
-    "projectPlanning": "Project Planning"
+    "projectPlanning": "Project Planning",
+    "sectionChat": "Chat",
+    "sectionAgent": "Agent",
+    "sectionSettings": "Settings",
+    "chat": "Chat",
+    "deleteConversation": "Delete Conversation",
+    "deleteConfirm": "Are you sure you want to delete this conversation?"
+  },
+  "nav": {
+    "chat": "Chat",
+    "general": "General Settings",
+    "sandbox": "Sandbox",
+    "models": "Model Services",
+    "mcp": "MCP Servers",
+    "skills": "Skill Management",
+    "users": "User Management"
   },
   "mcp": {
     "title": "MCP Servers",
@@ -180,7 +195,10 @@
     "send": "Send",
     "selectModel": "Select Model",
     "currentModel": "Current Model",
-    "noModels": "No models available"
+    "noModels": "No models available",
+    "emptyHint": "Ask a question or describe a coding task to get started.",
+    "switchModel": "Switch Model",
+    "thinking": "Thinking..."
   },
   "sandbox": {
     "title": "Sandbox Settings",

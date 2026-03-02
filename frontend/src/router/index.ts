@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import ChatView from '../views/ChatView.vue'
+import SettingsLayout from '../components/layout/SettingsLayout.vue'
 import { useAuthStore } from '../store/auth'
-import { useSettingsDrawer } from '../composables/useSettingsDrawer'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -18,12 +18,40 @@ const router = createRouter({
     },
     {
       path: '/settings',
-      name: 'settings',
-      redirect: () => {
-        const { openSettings } = useSettingsDrawer()
-        openSettings()
-        return { name: 'home' }
-      }
+      component: SettingsLayout,
+      redirect: { name: 'settings-general' },
+      children: [
+        {
+          path: 'general',
+          name: 'settings-general',
+          component: () => import('../components/settings/GeneralSettings.vue')
+        },
+        {
+          path: 'sandbox',
+          name: 'settings-sandbox',
+          component: () => import('../components/settings/SandboxSettings.vue')
+        },
+        {
+          path: 'models',
+          name: 'settings-models',
+          component: () => import('../components/settings/ModelServices.vue')
+        },
+        {
+          path: 'mcp',
+          name: 'settings-mcp',
+          component: () => import('../components/settings/MCPServers.vue')
+        },
+        {
+          path: 'skills',
+          name: 'settings-skills',
+          component: () => import('../components/settings/SkillManagement.vue')
+        },
+        {
+          path: 'users',
+          name: 'settings-users',
+          component: () => import('../components/settings/UserManagement.vue')
+        },
+      ]
     },
     {
       path: '/login',

@@ -21,7 +21,22 @@
     "search": "検索",
     "recentChats": "最近のチャット",
     "emptyHistory": "最近のチャットがここに表示されます。",
-    "projectPlanning": "プロジェクト計画"
+    "projectPlanning": "プロジェクト計画",
+    "sectionChat": "チャット",
+    "sectionAgent": "エージェント",
+    "sectionSettings": "設定",
+    "chat": "チャット",
+    "deleteConversation": "会話を削除",
+    "deleteConfirm": "この会話を削除してもよろしいですか？"
+  },
+  "nav": {
+    "chat": "チャット",
+    "general": "一般設定",
+    "sandbox": "サンドボックス",
+    "models": "モデルサービス",
+    "mcp": "MCP サーバー",
+    "skills": "スキル管理",
+    "users": "ユーザー管理"
   },
   "mcp": {
     "title": "MCP サーバー",
@@ -164,7 +179,10 @@
     "send": "送信",
     "selectModel": "モデルを選択",
     "currentModel": "現在のモデル",
-    "noModels": "利用可能なモデルがありません"
+    "noModels": "利用可能なモデルがありません",
+    "emptyHint": "質問するか、コーディングタスクを説明してください。",
+    "switchModel": "モデル切り替え",
+    "thinking": "考え中..."
   },
   "sandbox": {
     "title": "Sandbox設定",

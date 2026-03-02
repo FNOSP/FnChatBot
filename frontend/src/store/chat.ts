@@ -20,6 +20,15 @@ export interface Model {
   api_key: string
 }
 
+export interface Session {
+  id: number
+  title: string
+  model_id: number
+  user_id: number
+  created_at: string
+  updated_at: string
+}
+
 export const useChatStore = defineStore('chat', () => {
   const messages = ref<Message[]>([])
   const isThinking = ref(false)
@@ -28,6 +37,7 @@ export const useChatStore = defineStore('chat', () => {
   const wsService = ref<WebSocketService | null>(null)
   const models = ref<Model[]>([])
   const currentModelId = ref<number | null>(null)
+  const conversations = ref<Session[]>([])
 
   const currentModel = computed(() => {
     if (currentModelId.value === null) return null
@@ -48,6 +58,39 @@ export const useChatStore = defineStore('chat', () => {
     } catch (e) {
       console.error('Failed to fetch models', e)
       models.value = []
+    }
+  }
+
+  const fetchConversations = async () => {
+    try {
+      const res = await http.get('/conversations')
+      conversations.value = res.data || []
+    } catch (e) {
+      console.error('Failed to fetch conversations', e)
+      conversations.value = []
+    }
+  }
+
+  const createConversation = async (title = '新对话'): Promise<Session | null> => {
+    try {
+      const res = await http.post('/conversations', { title })
+      const session: Session = res.data
+      conversations.value = [session, ...conversations.value]
+      return session
+    } catch (e) {
+      console.error('Failed to create conversation', e)
+      return null
+    }
+  }
+
+  const deleteConversation = async (id: number): Promise<boolean> => {
+    try {
+      await http.delete(`/conversations/${id}`)
+      conversations.value = conversations.value.filter(c => c.id !== id)
+      return true
+    } catch (e) {
+      console.error('Failed to delete conversation', e)
+      return false
     }
   }
 
@@ -133,9 +176,13 @@ export const useChatStore = defineStore('chat', () => {
     models,
     currentModelId,
     currentModel,
+    conversations,
     connect,
     sendMessage,
     setCurrentModel,
-    fetchModels
+    fetchModels,
+    fetchConversations,
+    createConversation,
+    deleteConversation,
   }
 })

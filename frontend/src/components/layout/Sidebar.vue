@@ -1,102 +1,173 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { SettingIcon, AddIcon } from 'tdesign-icons-vue-next'
+import {
+  ChatIcon,
+  RobotIcon,
+  SettingIcon,
+  SecuredIcon,
+  ServerIcon,
+  CloudIcon,
+  CodeIcon,
+  UserIcon,
+  AppIcon,
+} from 'tdesign-icons-vue-next'
 import { useAuthStore } from '../../store/auth'
 import { useTheme } from '../../composables/useTheme'
-import { useSettingsDrawer } from '../../composables/useSettingsDrawer'
-import { computed } from 'vue'
 
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
-const auth = useAuthStore()
+const { isAdmin } = useAuthStore()
 const { isDark } = useTheme()
-const { settingsVisible, toggleSettings } = useSettingsDrawer()
 
-const menuTheme = computed(() => isDark.value ? 'dark' : 'light')
+const menuTheme = computed(() => (isDark.value ? 'dark' : 'light'))
 
+// Compute the active menu value from current route
 const activeValue = computed(() => {
-  if (route.path.startsWith('/chat')) return 'chat'
+  const p = route.path
+  if (p.startsWith('/settings/general')) return 'settings-general'
+  if (p.startsWith('/settings/sandbox')) return 'settings-sandbox'
+  if (p.startsWith('/settings/models')) return 'settings-models'
+  if (p.startsWith('/settings/mcp')) return 'settings-mcp'
+  if (p.startsWith('/settings/skills')) return 'settings-skills'
+  if (p.startsWith('/settings/users')) return 'settings-users'
+  if (p.startsWith('/chat') || p === '/') return 'chat'
   return ''
 })
 
-const handleNewChat = () => {
-  router.push('/')
+// Which submenus should be expanded by default
+const defaultExpanded = computed(() => {
+  const p = route.path
+  const expanded: string[] = ['section-chat']
+  if (p.startsWith('/settings/skills') || p.startsWith('/settings/mcp')) {
+    expanded.push('section-agent')
+  }
+  if (
+    p.startsWith('/settings/general') ||
+    p.startsWith('/settings/sandbox') ||
+    p.startsWith('/settings/models') ||
+    p.startsWith('/settings/users')
+  ) {
+    expanded.push('section-settings')
+  }
+  return expanded
+})
+
+const navigate = (path: string) => {
+  router.push(path)
 }
 </script>
 
 <template>
-  <t-aside
-    v-if="auth.isAuthenticated"
-    width="260px"
-    class="bg-bg-secondary border-r border-border shadow-md flex flex-col"
+  <div
+    class="nav-sidebar flex flex-col border-r border-border shrink-0"
+    style="width: 200px;"
   >
+    <!-- Logo -->
+    <div class="px-4 py-4 flex items-center gap-2 shrink-0 border-b border-border">
+      <AppIcon class="text-brand text-xl" />
+      <span class="text-base font-bold text-text-primary tracking-tight">FnChatBot</span>
+      <span class="ml-auto px-1.5 py-0.5 text-[9px] rounded-full bg-brand/10 text-brand uppercase tracking-wide shrink-0">
+        Beta
+      </span>
+    </div>
+
+    <!-- Navigation Menu -->
     <t-menu
       :value="activeValue"
       :theme="menuTheme"
-      class="h-full !border-0 !bg-transparent flex-1 flex flex-col"
+      :default-expanded="defaultExpanded"
+      collapsed-width="0"
+      class="nav-menu flex-1 !border-0 !bg-transparent overflow-y-auto"
     >
-      <template #logo>
-        <div class="px-4 py-4 flex items-center justify-between">
-          <span class="text-lg font-semibold text-text-primary">FnChatBot</span>
-          <span class="px-2 py-0.5 text-[10px] rounded-full bg-brand/10 text-brand uppercase tracking-wide">
-            Beta
-          </span>
-        </div>
-      </template>
-      
-      <t-menu-item
-        value="new-chat"
-        @click="handleNewChat"
-        class="sidebar-nav-btn mx-3 mt-4 mb-1 rounded-lg"
-      >
-        <template #icon>
-          <AddIcon />
-        </template>
-        {{ t('sidebar.newChat') }}
-      </t-menu-item>
-
-      <div class="flex-1 min-h-0 flex flex-col mt-2">
-        <t-menu-group :title="t('sidebar.recentChats')" class="flex-1 min-h-0">
-          <div class="px-3 pb-3 text-xs text-text-muted">
-            {{ t('sidebar.emptyHistory') }}
-          </div>
-        </t-menu-group>
-      </div>
-
-      <template #operations>
-        <t-menu-item
-          value="settings"
-          @click="toggleSettings"
-          :class="['sidebar-nav-btn', { 'sidebar-nav-active': settingsVisible }]"
-        >
-          <template #icon>
-            <SettingIcon />
-          </template>
-          {{ t('settings.title') }}
+      <!-- Chat Section -->
+      <t-submenu value="section-chat">
+        <template #icon><ChatIcon /></template>
+        <template #title>{{ t('sidebar.sectionChat') }}</template>
+        <t-menu-item value="chat" @click="navigate('/')">
+          <template #icon><ChatIcon /></template>
+          {{ t('sidebar.chat') }}
         </t-menu-item>
-      </template>
+      </t-submenu>
+
+      <!-- Agent Section -->
+      <t-submenu value="section-agent">
+        <template #icon><RobotIcon /></template>
+        <template #title>{{ t('sidebar.sectionAgent') }}</template>
+        <t-menu-item value="settings-skills" @click="navigate('/settings/skills')">
+          <template #icon><CodeIcon /></template>
+          {{ t('settings.skillManagement') }}
+        </t-menu-item>
+        <t-menu-item value="settings-mcp" @click="navigate('/settings/mcp')">
+          <template #icon><CloudIcon /></template>
+          {{ t('settings.mcpServers') }}
+        </t-menu-item>
+      </t-submenu>
+
+      <!-- Settings Section -->
+      <t-submenu value="section-settings">
+        <template #icon><SettingIcon /></template>
+        <template #title>{{ t('sidebar.sectionSettings') }}</template>
+        <t-menu-item value="settings-general" @click="navigate('/settings/general')">
+          <template #icon><SettingIcon /></template>
+          {{ t('settings.general') }}
+        </t-menu-item>
+        <t-menu-item value="settings-sandbox" @click="navigate('/settings/sandbox')">
+          <template #icon><SecuredIcon /></template>
+          {{ t('settings.sandbox') }}
+        </t-menu-item>
+        <t-menu-item value="settings-models" @click="navigate('/settings/models')">
+          <template #icon><ServerIcon /></template>
+          {{ t('settings.modelServices') }}
+        </t-menu-item>
+        <t-menu-item
+          v-if="isAdmin"
+          value="settings-users"
+          @click="navigate('/settings/users')"
+        >
+          <template #icon><UserIcon /></template>
+          {{ t('settings.userManagement') }}
+        </t-menu-item>
+      </t-submenu>
     </t-menu>
-  </t-aside>
+  </div>
 </template>
 
 <style scoped>
-/* Override TDesign default menu width (232px) to fill sidebar container */
-:deep(.t-default-menu) {
-  width: 100% !important;
-  display: block !important;
+.nav-sidebar {
+  background: var(--td-bg-color-container);
 }
 
-/* Keep nav buttons transparent; TDesign handles text color via :theme binding */
-:deep(.sidebar-nav-btn) {
-  background: transparent !important;
+:deep(.nav-menu) {
+  width: 100% !important;
 }
-:deep(.sidebar-nav-btn:hover) {
-  background: var(--bg-hover) !important;
+
+:deep(.t-menu__item) {
+  border-radius: 6px;
+  margin: 1px 6px;
+  width: calc(100% - 12px) !important;
 }
-:deep(.sidebar-nav-active) {
-  background: var(--bg-hover) !important;
+
+:deep(.t-submenu__title) {
+  border-radius: 6px;
+  margin: 1px 6px;
+  width: calc(100% - 12px) !important;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  opacity: 0.6;
+  text-transform: uppercase;
+}
+
+:deep(.t-menu__item--active) {
+  background: var(--td-brand-color-light) !important;
   color: var(--td-brand-color) !important;
+}
+
+:deep(.t-submenu .t-menu__item) {
+  padding-left: 36px !important;
+  font-size: 13px;
 }
 </style>
