@@ -47,12 +47,9 @@ const handleLangChange = (val: string) => {
     <!-- Panel 1: Navigation Sidebar -->
     <Sidebar />
 
-    <!-- Panel 2: Conversation Sidebar (chat mode only) -->
-    <ConversationSidebar v-if="showConversationSidebar" />
-
-    <!-- Panel 3: Main Content Area -->
+    <!-- Panel 2: Title bar + content area (spans from nav right edge to screen right) -->
     <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
-      <!-- Title Bar -->
+      <!-- 1. Top title bar: extends from nav sidebar right edge to screen right edge -->
       <header class="content-header h-12 shrink-0 flex items-center justify-between px-5 border-b border-border">
         <!-- Left: current page name -->
         <h1 class="text-sm font-semibold text-text-primary tracking-wide">
@@ -90,9 +87,12 @@ const handleLangChange = (val: string) => {
         </div>
       </header>
 
-      <!-- Content Slot -->
-      <div class="flex-1 min-h-0 overflow-hidden bg-bg-card">
-        <slot />
+      <!-- 2. Below title bar: conversation sidebar + main content (side by side) -->
+      <div class="flex-1 flex min-h-0 overflow-hidden">
+        <ConversationSidebar v-if="showConversationSidebar" />
+        <div class="flex-1 flex flex-col min-w-0 overflow-hidden bg-bg-card">
+          <slot />
+        </div>
       </div>
     </div>
   </div>
